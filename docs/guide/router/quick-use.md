@@ -1,5 +1,5 @@
 # 快速上手
-::: tips
+:::tip
 推荐使用[wot-starter](https://starter.wot-ui.cn)作为参考，已经集成了`@wot-ui/router`和`@uni-helper/vite-plugin-uni-pages`，可以直接使用，无需关心本章节配置。
 :::
 ## 配置路由
