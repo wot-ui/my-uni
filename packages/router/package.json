@@ -1,6 +1,6 @@
 {
   "name": "@my-uni/router",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "description": "轻量级 uni-app vue3 路由库",
   "type": "module",
   "main": "dist/index.js",
