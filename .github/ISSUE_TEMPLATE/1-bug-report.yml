@@ -8,7 +8,7 @@ body:
       value: |
         在向我们提交 Bug 报告前，请优先使用以下方式尝试解决问题：
         - 在组件文档 [my-uni](https://my-uni.wot-ui.cn/) 确认使用方法是否正确
-        - 尝试在 [Issue](https://github.com/Moonofweisheng/my-uni/issues) 列表中搜索相同问题
+        - 尝试在 [Issue](https://github.com/wot-ui/my-uni/issues) 列表中搜索相同问题
 
   - type: input
     id: version

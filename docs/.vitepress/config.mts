@@ -108,7 +108,7 @@ export default defineConfig({
 var _hmt = _hmt || [];
 (function() {
   var hm = document.createElement("script");
-  hm.src = "https://hm.baidu.com/hm.js?45a448dc275714ac7c6e31b0f284124e";
+  hm.src = "https://hm.baidu.com/hm.js?6598c335941704a886a664e29951f096";
   var s = document.getElementsByTagName("script")[0];
   s.parentNode.insertBefore(hm, s);
 })();
@@ -120,7 +120,7 @@ var _hmt = _hmt || [];
       text: '最后更新',
     },
     editLink: {
-      pattern: 'https://github.com/wot-ui/wot-starter/docs/edit/main/:path',
+      pattern: 'https://github.com/wot-ui/my-uni/docs/edit/main/:path',
       text: '为此页提供修改建议',
     },
     socialLinks: [
@@ -141,10 +141,10 @@ var _hmt = _hmt || [];
     },
     nav: [
       { text: '首页', link: '/' },
-      { text: '快速开始', link: '/guide/installation' },
       { text: '更新日志', link: '/guide/changelog' },
       { text: '🥤一杯咖啡', link: 'https://wot-ui.cn/reward/reward' },
       { text: 'Wot UI', link: 'https://wot-ui.cn/' },
+      { text: 'Wot Starter  ', link: 'https://starter.wot-ui.cn/' },
       { text: '关于作者', link: 'https://blog.wot-ui.cn/about' },
     ],
     sidebar: [

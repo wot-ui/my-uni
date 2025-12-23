@@ -20,4 +20,4 @@
 
 ## 关于我们
 
-**如果您的问题不在上述列表中或您有更好的建议，请联系我们 [Moonofweisheng](https://github.com/Moonofweisheng/my-uni)**
+**如果您的问题不在上述列表中或您有更好的建议，请联系我们 [Moonofweisheng](https://github.com/wot-ui/my-uni)**
