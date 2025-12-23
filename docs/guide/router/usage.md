@@ -9,7 +9,7 @@
 ```ts
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from '@my-uni/router'
+import { useRouter } from '@wot-ui/router'
 import { getCurrentInstance } from 'vue'
 
 // 使用hooks（推荐）
@@ -106,7 +106,7 @@ url有长度限制，太长的字符串会传递失败，可改用[窗体通信]
 ```ts
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from '@my-uni/router'
+import { useRouter } from '@wot-ui/router'
 import { getCurrentInstance } from 'vue'
 
 let router = useRouter()

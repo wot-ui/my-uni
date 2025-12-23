@@ -1,5 +1,5 @@
 {
-  "name": "@my-uni/router",
+  "name": "@wot-ui/router",
   "version": "0.0.3",
   "description": "轻量级 uni-app vue3 路由库",
   "type": "module",
@@ -30,7 +30,7 @@
     "uni-app",
     "router",
     "uni-mini-router",
-    "@my-uni/router"
+    "@wot-ui/router"
   ],
   "peerDependencies": {
     "vue": "~3.4.38"

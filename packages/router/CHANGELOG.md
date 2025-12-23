@@ -1,4 +1,4 @@
-# @my-uni/router
+# @wot-ui/router
 
 ## 0.1.0
 

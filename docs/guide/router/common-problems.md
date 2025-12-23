@@ -7,9 +7,9 @@
 目前没有支持。
 
 
-## @my-uni/router 的目标？
+## @wot-ui/router 的目标？
 
-`@my-uni/router`目标是基于小程序平台，将`uni-app`路由相关的API对齐`Vue Router`，而并非提供完全的`Vue Router`。
+`@wot-ui/router`目标是基于小程序平台，将`uni-app`路由相关的API对齐`Vue Router`，而并非提供完全的`Vue Router`。
 
 
 ## 导航守卫的局限？

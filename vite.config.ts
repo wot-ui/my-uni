@@ -25,7 +25,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   base: './',
   optimizeDeps: {
-    exclude: process.env.NODE_ENV === 'development' ? ['wot-design-uni', 'uni-echarts', '@my-uni/router'] : [],
+    exclude: process.env.NODE_ENV === 'development' ? ['wot-design-uni', 'uni-echarts', '@wot-ui/router'] : [],
   },
   plugins: [
     // https://github.com/uni-helper/vite-plugin-uni-manifest
@@ -69,7 +69,7 @@ export default defineConfig({
         from: 'wot-design-uni',
         imports: ['useToast', 'useMessage', 'useNotify', 'CommonUtil'],
       }, {
-        from: '@my-uni/router',
+        from: '@wot-ui/router',
         imports: ['createRouter', 'useRouter', 'useRoute'],
       }, {
         from: 'alova/client',
