@@ -1,6 +1,13 @@
 # 更新日志 
 
 
+### [0.0.7](https://github.com/wot-ui/my-uni/compare/v0.0.6...v0.0.7) (2025-12-25)
+
+
+### ✏️ Documentation | 文档
+
+* ✏️  remove dead links ([4035a7d](https://github.com/wot-ui/my-uni/commit/4035a7df8f86442b11c49f4629b18878a43316cf))
+
 ### [0.0.6](https://github.com/wot-ui/my-uni/compare/v0.0.5...v0.0.6) (2025-12-25)
 
 
