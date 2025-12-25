@@ -1,6 +1,13 @@
 # 更新日志 
 
 
+### [0.0.6](https://github.com/wot-ui/my-uni/compare/v0.0.5...v0.0.6) (2025-12-25)
+
+
+### ✏️ Documentation | 文档
+
+* ✏️  update docs ([11bb7c3](https://github.com/wot-ui/my-uni/commit/11bb7c339d74cb96a46b4f3992b1d07bda870d23))
+
 ### [0.0.5](https://github.com/wot-ui/my-uni/compare/v0.0.4...v0.0.5) (2025-12-25)
 
 
