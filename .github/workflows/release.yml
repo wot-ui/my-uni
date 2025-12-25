@@ -6,8 +6,9 @@ on:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
