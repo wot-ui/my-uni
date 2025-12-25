@@ -34,7 +34,6 @@ export function createRouter(options: RouterOptions): Router {
     if (typeof to === 'string') {
       return resolvePath(to)
     }
-
     // 处理 name 匹配
     if (to.name) {
       const route = routes.find(r => r.name === to.name)
@@ -52,6 +51,10 @@ export function createRouter(options: RouterOptions): Router {
         hash: to.hash || '',
         fullPath: stringifyQuery(path, finalQuery),
         meta: route.meta || {},
+        style: route.style || {},
+        ...Object.fromEntries(
+          Object.entries(route).filter(([key]) => !['path', 'name', 'meta', 'style', 'aliasPath'].includes(key))
+        )
       }
     }
 
@@ -82,11 +85,15 @@ export function createRouter(options: RouterOptions): Router {
     return {
       path: normalizedPath,
       name: route?.name,
-      params: {}, // path 模式下暂不解析 params
+      params: {},
       query: finalQuery,
       hash: '',
       fullPath: stringifyQuery(normalizedPath, finalQuery),
       meta: route?.meta || {},
+      style: route?.style || {},
+      ...Object.fromEntries(
+        Object.entries(route || {}).filter(([key]) => !['path', 'name', 'meta', 'style', 'aliasPath'].includes(key))
+      )
     }
   }
 
@@ -339,10 +346,14 @@ export function createRouter(options: RouterOptions): Router {
         path: newPath,
         name: matched?.name,
         meta: matched?.meta || {},
-        params: {}, // 原生页面无法直接获取 params，通常在 query 中
+        params: {},
         query: q,
         hash: '',
         fullPath: fullPath.startsWith('/') ? fullPath : `/${fullPath}`,
+        style: matched?.style || {},
+        ...Object.fromEntries(
+          Object.entries(matched || {}).filter(([key]) => !['path', 'name', 'meta', 'style', 'aliasPath'].includes(key))
+        )
       }
 
       router.currentRoute.value = to
