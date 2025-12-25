@@ -163,7 +163,6 @@ var _hmt = _hmt || [];
               { text: '基础用法', link: '/guide/router/usage' },
               { text: 'API 参考', link: '/guide/router/api' },
               { text: '常见问题', link: '/guide/router/common-problems' },
-              { text: '更新日志', link: '/guide/router/changelog' },
             ],
           },
         ],

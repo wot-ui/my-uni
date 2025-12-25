@@ -25,7 +25,7 @@ url: subPages/router/index
 ## 链接
 
 * [意见反馈](https://github.com/Moonofweisheng/uni-mini-router/issues)
-* [更新日志](/guide/router/changelog)
+* [更新日志](/guide/changelog)
 * [常见问题](/guide/router/common-problems)
 * [Discussions 讨论区](https://github.com/Moonofweisheng/uni-mini-router/discussions)
 * [高颜值vue3组件库 Wot Design Uni](https://wot-design-uni.netlify.app/)
