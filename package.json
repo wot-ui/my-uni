@@ -6,6 +6,10 @@
   "packageManager": "pnpm@9.9.0",
   "description": "专为 uni-app 开发的摸鱼插件库，包含路由、CI/CD 等插件，助你轻松工作，天天摸鱼！",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wot-ui/my-uni.git"
+  },
   "engines": {
     "node": ">=20.19.0 || >=22.12.0 || >=24.0.0"
   },

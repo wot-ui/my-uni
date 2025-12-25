@@ -2,6 +2,11 @@
   "name": "@wot-ui/router",
   "version": "0.0.8",
   "description": "轻量级 uni-app vue3 路由库",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wot-ui/my-uni.git",
+    "directory": "packages/router"
+  },
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
