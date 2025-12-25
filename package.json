@@ -1,7 +1,7 @@
 {
   "name": "my-uni-tools",
   "type": "module",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "private": true,
   "packageManager": "pnpm@9.9.0",
   "description": "专为 uni-app 开发的摸鱼插件库，包含路由、CI/CD 等插件，助你轻松工作，天天摸鱼！",
