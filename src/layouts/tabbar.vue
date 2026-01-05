@@ -1,3 +1,12 @@
+<!--
+ * @Author: weisheng
+ * @Date: 2025-12-22 14:19:12
+ * @LastEditTime: 2026-01-05 18:59:24
+ * @LastEditors: weisheng
+ * @Description:
+ * @FilePath: /my-uni/src/layouts/tabbar.vue
+ * 记得注释
+-->
 <script lang="ts" setup>
 const router = useRouter()
 

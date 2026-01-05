@@ -1,5 +1,5 @@
 import { shallowRef, unref } from 'vue'
-import type { App } from 'vue'
+import type { App, InjectionKey, Ref } from 'vue'
 import type {
   LocationQuery,
   NavigationGuard,
@@ -16,8 +16,8 @@ import { START_LOCATION_NORMALIZED } from './types'
 import { getUrlParams, normalizeUrl, stringifyQuery } from './utils'
 
 // 注入 Key
-export const routerKey = Symbol('router')
-export const routeKey = Symbol('route')
+export const routerKey: InjectionKey<Router> = Symbol('__ROUTER__')
+export const routeKey: InjectionKey<Ref<RouteLocationNormalized>  > = Symbol('__ROUTE__')
 
 export function createRouter(options: RouterOptions): Router {
   const currentRoute = shallowRef<RouteLocationNormalized>(

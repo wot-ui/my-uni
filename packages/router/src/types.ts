@@ -1420,7 +1420,7 @@ export interface GlobalStyle {
 
 export interface RouteLocationNormalized {
   path: string
-  name?: string | symbol
+  name?: string
   params: RouteParams
   query: LocationQuery
   hash: string

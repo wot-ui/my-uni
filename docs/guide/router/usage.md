@@ -49,7 +49,7 @@ router.push({ path: '/user', hash: '#section' })
 | 属性 | 类型 | 描述 |
 | --- | --- | --- |
 | path | `string` | 路由路径 |
-| name | `string \| symbol` | 路由名称 |
+| name | `string` | 路由名称 |
 | params | `RouteParams` | 路由参数（与 name 搭配使用） |
 | query | `LocationQuery` | 查询参数（与 path 搭配使用） |
 | hash | `string` | URL hash 值 |
@@ -65,7 +65,7 @@ router.push({ path: '/user', hash: '#section' })
 | 属性 | 类型 | 描述 |
 | --- | --- | --- |
 | path | `string` | 路由路径 |
-| name | `string \| symbol` | 路由名称（用于命名路由跳转） |
+| name | `string` | 路由名称（用于命名路由跳转） |
 | meta | `RouteMeta` | 路由元信息（可存储任意自定义数据） |
 | aliasPath | `string` | 路由别名路径（兼容旧版） |
 

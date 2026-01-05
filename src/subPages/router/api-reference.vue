@@ -7,6 +7,9 @@ definePage({
 })
 
 const router = useRouter()
+const route = useRoute()
+
+const currentPath = computed(() => route.path)
 
 function goBack() {
   router.back()
@@ -66,6 +69,23 @@ function copyCode(code: string) {
         </view>
       </view>
     </view>
+
+    <demo-block title="Hooks" transparent>
+      <view class="rounded-2 bg-white p-4 dark:bg-[var(--wot-dark-background2)]">
+        <view class="mb-3 text-4 text-gray-800 font-bold dark:text-[var(--wot-dark-color)]">
+          useRoute (响应式)
+        </view>
+        <view class="mb-3 text-3.5 text-gray-600 dark:text-[var(--wot-dark-color2)]">
+          当前路由路径 (computed): {{ currentPath }}
+        </view>
+        <view class="mb-3 border border-gray-200 rounded-2 bg-gray-50 p-3 dark:border-[var(--wot-dark-border)] dark:bg-[var(--wot-dark-background3)]" @click="copyCode('const route = useRoute()\nconst currentPath = computed(() => route.path)')">
+          <text class="text-3 text-gray-700 font-mono dark:text-[var(--wot-dark-color)]">
+            const route = useRoute()
+            const currentPath = computed(() => route.path)
+          </text>
+        </view>
+      </view>
+    </demo-block>
 
     <demo-block title="Router 方法" transparent>
       <view class="space-y-3">
@@ -216,7 +236,7 @@ function copyCode(code: string) {
               }
 
               interface RouteLocationNameRaw {
-              name: string | symbol
+              name: string
               params?: RouteParams
               query?: LocationQuery
               }
