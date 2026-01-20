@@ -44,8 +44,8 @@ describe('stringifyQuery - 查询参数序列化', () => {
   })
 
   it('应该处理 null 和 undefined 值', () => {
-    const result = stringifyQuery('/pages/index', { id: '1', name: null, age: undefined })
-    expect(result).toBe('/pages/index?id=1')
+    const result = stringifyQuery('/pages/index', { id: '1', name: null, age: undefined, num: 2 })
+    expect(result).toBe('/pages/index?id=1&num=2')
   })
 
   it('应该追加到现有的查询字符串', () => {

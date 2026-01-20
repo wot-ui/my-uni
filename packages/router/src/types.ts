@@ -1,7 +1,9 @@
 import type { App, Ref } from 'vue'
 
 export type RouteParams = Record<string, string | string[]>
-export type LocationQuery = Record<string, string | null | (string | null)[]>
+
+export type LocationQueryValue = string | number | null | undefined
+export type LocationQuery = Record<string, LocationQueryValue | Exclude<LocationQueryValue, null | undefined>[]>
 export type RouteMeta = Record<string | number | symbol, unknown>
 
 export type AnimationType = 'auto' | 'none' | 'slide-out-right' | 'slide-out-left' | 'slide-out-top' | 'slide-out-bottom' | 'fade-out' | 'zoom-in' | 'zoom-fade-in' | 'pop-out'
