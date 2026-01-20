@@ -326,9 +326,10 @@ export function createRouter(options: RouterOptions): Router {
 
       // 避免重复更新
       const newPath = `/${page.route}`
+      const newFullPath = fullPath.startsWith('/') ? fullPath : `/${fullPath}`
 
-      // 如果当前路由已经是最新路径，则跳过更新（避免重复触发）
-      if (router.currentRoute.value.path === newPath) {
+      // 如果当前路由已经是最新，则跳过更新（避免重复触发）
+      if (router.currentRoute.value.fullPath === newFullPath) {
         return
       }
 
