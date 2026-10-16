@@ -110,6 +110,14 @@ export function createApp() {
 }
 ```
 
+## 路径和名称补全（可选） {#typed-routes}
+
+完成上面的路由配置后，可以为 `router.push({ path: … })`、`router.push({ name: … })` 等调用开启可选值提示，调用方式不变。
+
+使用 uni-pages 的项目只需在现有插件配置中增加一个生成声明的钩子，再启动一次开发服务。完整步骤见[路径与名称补全](./typed-routes.md#auto-setup)，包括页面名称配置、可复制的 Vite 配置和生效检查。
+
+默认只提供补全；如果还希望拼错时产生 TypeScript 错误，可以进一步开启[严格模式](./typed-routes.md#strict-mode)。
+
 ## 配置自动按需导入（可选）
 
 使用`unplugin-auto-import`可以实现API的自动按需导入，提升开发效率。

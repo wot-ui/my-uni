@@ -56,6 +56,8 @@
 
 ## Router实例方法
 
+导航目标中的 `path` 使用 `RoutePath`，`name` 使用 `RouteName`。配置声明后可提示项目内的候选值；默认仍接受动态字符串，严格模式才限制已注册的值。接入步骤见[路径与名称补全](./typed-routes.md)。
+
 ### push方法
 
 ▸ router.push(target:RouteLocationRaw): void
@@ -98,4 +100,56 @@
 | delta | `number` | 返回的页面数，默认值为 `1` |
 | animationType | `AnimationType` | 窗口动画类型 |
 | animationDuration | `number` | 窗口动画持续时间，单位为 ms |
+
+## 路由补全类型
+
+以下类型从 `@wot-ui/router` 导出：
+
+| 类型 | 用途 |
+| --- | --- |
+| `RouterTypeConfig` | 通过模块增强注册 `path`、`name` 字符串字面量联合类型，以及可选的 `strict: true` |
+| `RoutePath` | 导航路径类型，支持已注册路径及其 `?query` 形式 |
+| `RouteName` | 导航名称类型 |
+
+未注册的字段保持 `string`。默认模式在提供补全的同时接受普通字符串；严格模式只接受已注册字段的候选值。`RouteRecordRaw` 仍用于定义运行时路由，补全声明不会代替路由配置。
+
+## 路由声明生成工具
+
+从 `@wot-ui/router/typed-routes` 导入，仅供 Node.js 构建配置或脚本使用。
+
+### writeRouteTypes
+
+`writeRouteTypes(config, options): void`
+
+根据页面配置生成声明文件。内容未变化时跳过写入，父目录不存在时自动创建。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `config` | `RouteTypePagesConfig` | 页面配置，结构见下方示例；调用方应提供与运行时路由一致的数据 |
+| `options.dts` | `string` | 必填，声明文件输出路径；相对路径基于进程工作目录，推荐使用绝对路径 |
+| `options.strict` | `boolean` | 默认 `false`；为 `true` 时在生成声明中启用严格模式 |
+
+```ts
+import { writeRouteTypes } from '@wot-ui/router/typed-routes'
+
+writeRouteTypes({
+  pages: [{ path: 'pages/index/index', name: 'home' }],
+  subPackages: [{
+    root: 'subPages',
+    pages: [{ path: 'detail/index', name: 'detail' }],
+  }],
+}, {
+  dts: 'src/typed-router.d.ts',
+})
+```
+
+每个页面包含 `path: string`，以及可选的 `name: string`、`aliasPath: string`。主包路径加上前导 `/`，分包路径拼接为 `/${root}/${path}`；别名按配置值原样收集，不拼接分包目录。路径和名称分别去重、排序，没有名称的页面只生成路径类型。
+
+### generateRouteTypes
+
+`generateRouteTypes(config, options?): string`
+
+接收相同的页面配置，返回声明文本，不写入文件。`options` 仅包含可选的 `strict`，适合已有文件生成流程的项目。
+
+这两个工具不负责扫描页面、解析 `pages.json` 或监听文件变化。使用 uni-pages 时可按[自动生成步骤](./typed-routes.md#auto-setup)接入；其他项目需自行读取配置并在变化后重新调用。带注释或条件编译的页面配置应先由对应工具解析，再传入生成器。
 

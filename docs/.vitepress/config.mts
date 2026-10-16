@@ -161,6 +161,7 @@ var _hmt = _hmt || [];
               { text: '安装', link: '/guide/router/installation' },
               { text: '快速上手', link: '/guide/router/quick-use' },
               { text: '基础用法', link: '/guide/router/usage' },
+              { text: '路径与名称补全', link: '/guide/router/typed-routes' },
               { text: 'API 参考', link: '/guide/router/api' },
               { text: '常见问题', link: '/guide/router/common-problems' },
             ],

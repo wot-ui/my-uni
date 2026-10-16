@@ -148,6 +148,9 @@
   "pnpm": {
     "overrides": {
       "unconfig": "7.3.2"
+    },
+    "patchedDependencies": {
+      "@uni-helper/uni-app-types@1.0.0-alpha.6": "patches/@uni-helper__uni-app-types@1.0.0-alpha.6.patch"
     }
   },
   "lint-staged": {
