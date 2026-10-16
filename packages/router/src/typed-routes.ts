@@ -1,5 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 
 export interface RouteTypePage {
   path: string
@@ -50,7 +51,7 @@ ${options.strict ? '    strict: true\n' : ''}  }
 `
 }
 
-/** 同步写入，适用于 uni-pages 的同步生命周期钩子；内容不变时不触发文件更新。 */
+/** 同步原子替换，适用于 uni-pages 的同步生命周期钩子；内容不变时不触发文件更新。 */
 export function writeRouteTypes(config: RouteTypePagesConfig, options: RouteTypeOptions & { dts: string }): void {
   const content = generateRouteTypes(config, options)
   try {
@@ -61,6 +62,20 @@ export function writeRouteTypes(config: RouteTypePagesConfig, options: RouteType
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
       throw error
   }
-  mkdirSync(dirname(options.dts), { recursive: true })
-  writeFileSync(options.dts, content, 'utf8')
+  const directory = dirname(options.dts)
+  mkdirSync(directory, { recursive: true })
+  const temporary = join(directory, `.${basename(options.dts)}.${randomUUID()}.tmp`)
+  try {
+    writeFileSync(temporary, content, 'utf8')
+    renameSync(temporary, options.dts)
+  }
+  catch (error) {
+    try {
+      rmSync(temporary, { force: true })
+    }
+    catch {
+      // 清理失败时仍保留原始写入或替换错误。
+    }
+    throw error
+  }
 }
