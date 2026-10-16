@@ -15,7 +15,14 @@ const options = {
   noEmit: true,
   types: [],
 }
-const expected = { path: ['/pages/home', '/shop/detail'], name: ['home', 'detail'] }
+const generatedConfigs = {
+  'generated.ts': {
+    pages: [{ path: 'pages/home', name: 'home' }, { path: 'pages/unnamed' }],
+    subPackages: [{ root: 'shop', pages: [{ path: 'detail', name: 'detail' }] }],
+  },
+  'generated-empty.ts': {},
+  'generated-unnamed.ts': { pages: [{ path: 'pages/unnamed' }] },
+}
 
 for (const fixture of readdirSync(resolve(root, 'type-tests')).filter(file => /\.[cm]?ts$/.test(file))) {
   const fileName = resolve(root, 'type-tests', fixture)
@@ -23,12 +30,10 @@ for (const fixture of readdirSync(resolve(root, 'type-tests')).filter(file => /\
     ? { ...options, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext }
     : options
   let source = readFileSync(fileName, 'utf8')
-  if (fixture === 'generated.ts') {
-    source += generateRouteTypes({
-      pages: [{ path: 'pages/home', name: 'home' }, { path: 'pages/unnamed' }],
-      subPackages: [{ root: 'shop', pages: [{ path: 'detail', name: 'detail' }] }],
-    }, { strict: true })
-  }
+  const expected = Object.fromEntries([...source.matchAll(/^\/\/ @expect:(path|name) (.+)$/gm)]
+    .map(([, key, values]) => [key, JSON.parse(values)]))
+  if (Object.hasOwn(generatedConfigs, fixture))
+    source += generateRouteTypes(generatedConfigs[fixture], { strict: true })
   const service = ts.createLanguageService({
     ...ts.sys,
     getCompilationSettings: () => compilerOptions,
@@ -50,18 +55,22 @@ for (const fixture of readdirSync(resolve(root, 'type-tests')).filter(file => /\
     }))
     let offset = 0
     let checks = 0
+    const checked = new Set()
     for (const line of source.split('\n')) {
       const marker = line.match(/\/\/ @complete:(path|name)/)
       if (marker) {
         const position = offset + line.lastIndexOf('\'', marker.index)
         const completions = service.getCompletionsAtPosition(fileName, position, {})
-        const names = completions?.entries.map(entry => entry.name) ?? []
-        for (const value of expected[marker[1]])
-          assert.ok(names.includes(value), `${fixture}: missing ${value} in completions for ${line}`)
+        const names = completions?.entries.filter(entry => entry.kind === ts.ScriptElementKind.string).map(entry => entry.name) ?? []
+        const key = marker[1]
+        assert.ok(Object.hasOwn(expected, key), `${fixture}: missing @expect:${key}`)
+        assert.deepEqual(names.sort(), [...expected[key]].sort(), `${fixture}: unexpected ${key} completions for ${line}`)
+        checked.add(key)
         checks++
       }
       offset += line.length + 1
     }
+    assert.deepEqual([...checked].sort(), Object.keys(expected).sort(), `${fixture}: unused completion expectations`)
     console.log(`${fixture}: type checks passed, ${checks} completion checks passed`)
   }
   finally {

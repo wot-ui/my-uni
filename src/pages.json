@@ -177,7 +177,7 @@
         {
           "path": "router/router-advanced-protected-target",
           "type": "page",
-          "name": "advanced-protected-target",
+          "name": "router-advanced-protected-target",
           "style": {
             "navigationBarTitleText": "受保护页面"
           }

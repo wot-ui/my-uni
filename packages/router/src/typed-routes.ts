@@ -25,17 +25,27 @@ export interface RouteTypeOptions {
 export function generateRouteTypes(config: RouteTypePagesConfig, options: RouteTypeOptions = {}): string {
   const paths = new Set<string>()
   const names = new Set<string>()
+  const namePaths = new Map<string, Set<string>>()
   const addPage = (page: RouteTypePage, root = '') => {
-    const path = [root, page.path].filter(Boolean).map(part => part.replace(/^\/+|\/+$/g, '')).join('/')
-    paths.add(`/${path}`)
+    const path = `/${[root, page.path].map(part => part.replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/')}`
+    paths.add(path)
     // aliasPath 在运行时直接匹配，不拼接分包 root。
     if (page.aliasPath)
       paths.add(page.aliasPath)
-    if (page.name)
+    if (page.name) {
       names.add(page.name)
+      const registered = namePaths.get(page.name) ?? new Set<string>()
+      registered.add(path)
+      namePaths.set(page.name, registered)
+    }
   }
   config.pages?.forEach(page => addPage(page))
   config.subPackages?.forEach(pkg => pkg.pages.forEach(page => addPage(page, pkg.root)))
+
+  for (const [name, registered] of namePaths) {
+    if (registered.size > 1)
+      console.warn(`[@wot-ui/router/typed-routes] 路由名称 ${JSON.stringify(name)} 对应多个路径：${[...registered].sort().join(', ')}。名称应全局唯一；运行时按名称导航只会匹配第一个页面。`)
+  }
 
   const union = (values: Set<string>) => [...values].sort().map(value => JSON.stringify(value)).join(' | ') || 'never'
   return `/* eslint-disable */

@@ -1,6 +1,9 @@
 import type { Router } from '@wot-ui/router'
 import { createRouter, useRouter } from '@wot-ui/router'
 
+// @expect:path ["/pages/home", "/shop/detail"]
+// @expect:name ["home", "detail"]
+
 declare module '@wot-ui/router' {
   interface RouterTypeConfig {
     path: '/pages/home' | '/shop/detail'

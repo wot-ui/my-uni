@@ -1,5 +1,8 @@
 import { useRouter } from '@wot-ui/router'
 
+// @expect:path ["/pages/home", "/pages/unnamed", "/shop/detail"]
+// @expect:name ["home", "detail"]
+
 // 测试脚本将真实生成器的输出加入这个独立项目。
 const router = useRouter()
 router.push({ path: '/pages/home' }) // @complete:path

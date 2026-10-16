@@ -17,10 +17,14 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...mocked, default: mocked }
 })
 
-afterEach(() => vi.resetAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.resetAllMocks()
+})
 
 describe('路由类型生成', () => {
   it('包含主包、分包、无名称页面及别名，并对重复值去重', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const result = generateRouteTypes({
       pages: [
         { path: '/pages/home', name: 'home', aliasPath: '/home' },
@@ -32,6 +36,29 @@ describe('路由类型生成', () => {
     expect(result).toContain('path: "/home" | "/pages/home" | "/pages/unnamed" | "/shop/detail"')
     expect(result).toContain('name: "detail" | "home"')
     expect(result).not.toContain('strict: true')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('同名但不同路径时提示主包和分包的冲突，重复记录不增加警告', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = generateRouteTypes({
+      pages: [{ path: '/home', name: 'home' }, { path: 'home/', name: 'home' }],
+      subPackages: [{ root: 'shop', pages: [{ path: 'detail', name: 'home' }, { path: 'other', name: 'home' }] }],
+    })
+    expect(result).toContain('name: "home"')
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"home" 对应多个路径：/home, /shop/detail, /shop/other'))
+  })
+
+  it('去除 root 和 path 首尾斜杠后再拼接，不产生空路径段', () => {
+    const result = generateRouteTypes({
+      subPackages: [
+        { root: '/', pages: [{ path: '/detail' }] },
+        { root: '///', pages: [{ path: '///detail///' }] },
+        { root: '/shop/', pages: [{ path: '/detail/' }] },
+      ],
+    })
+    expect(result).toContain('path: "/detail" | "/shop/detail"')
   })
 
   it('支持空路由、严格模式和需要转义的名称', () => {

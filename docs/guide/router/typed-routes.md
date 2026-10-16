@@ -54,7 +54,7 @@ definePage({
 | `src/pages/about/index.vue` | 未设置 | `/pages/about/index` | 无 |
 | `src/subPages/detail/index.vue` | `detail` | `/subPages/detail/index` | `detail` |
 
-分包目录需要配置在 uni-pages 的 `subPackages` 中。路由名称应全局唯一。
+分包目录需要配置在 uni-pages 的 `subPackages` 中。路由名称应全局唯一。生成器发现同名对应不同路径时，会在构建终端列出冲突名称和路径；仍会生成声明，但运行时按名称导航只匹配第一个页面。请修改页面的 `name` 并同步更新调用处。同一名称与路径的重复记录只做去重，不会警告。
 
 ### 2. 在已有的 uni-pages 配置中增加生成钩子
 
@@ -208,11 +208,15 @@ router.push({ name: target })
 
 来自接口或用户输入的任意字符串仍需先验证，声明文件本身不会验证这些数据。严格模式只约束注册过的字段；例如只注册 `name` 时，`path` 仍接受普通字符串。
 
+**自动生成总会注册 `path` 和 `name`，空集合会生成 `never`，不会回退成 `string`。** 如果页面都未配置 `name`，开启严格模式后只能按路径导航，按名称导航会报类型错误；先为需要按名称导航的页面配置 `name`。如果页面元数据整体为空，路径和名称导航都会被禁止，应检查页面扫描配置与钩子传入的数据。这与手工声明时省略某个字段不同：省略表示不约束该字段，`never` 表示该字段没有合法候选值。
+
 ## 支持范围
 
 `push`、`replace`、`replaceAll`、`pushTab` 都使用同一套路径和名称候选值。守卫中调用 `next({ name: 'home' })`、返回重定向对象，以及异步返回重定向对象也支持。
 
 目前只描述路径和名称，不校验 `params`、`query` 的业务字段；`pushTab` 的候选值也不会单独过滤成 tabBar 页面，使用时仍需遵守原有跳转限制。同一 TypeScript 项目中的 router 实例共享这份注册信息。
+
+字符串路径支持 `?query`，不支持 `#hash` 片段，例如 `/pages/index/index#section`；运行时不会把片段解析为独立的 hash，也不提供锚点滚动。对象上的 `hash` 字段不代表字符串导航支持 hash。
 
 ## 没有提示时怎么排查 {#troubleshooting}
 
@@ -235,6 +239,23 @@ router.push({ name: target })
 ### 开启严格模式后，原来的动态跳转报错
 
 严格模式不接受未经收窄的 `string`。需要保持原有动态跳转写法时，先使用默认补全模式；确认业务数据范围后，再逐步为变量补充类型或验证逻辑。
+
+### 声明写入失败，开发服务或构建中断
+
+检查 `dts` 指向的目录是否可写、目标是否被其他程序占用。写入使用同目录临时文件，完整写入后才替换目标；写入或替换失败会保留原文件并尝试清理临时文件。清理失败时可能留下 `.tmp` 文件，但不会覆盖最初的异常。进程被强制终止时也可能留下临时文件。
+
+异常会向调用方抛出，避免构建继续使用过期的路由类型。如需更明确的诊断，可以在钩子中补充输出路径并重新抛出原始异常，不要捕获后忽略：
+
+```ts
+const dts = resolve(ctx.root, 'src/typed-router.d.ts')
+try {
+  writeRouteTypes({ pages: ctx.pageMetaData, subPackages: ctx.subPageMetaData }, { dts })
+}
+catch (error) {
+  console.error(`无法更新路由声明：${dts}`)
+  throw error
+}
+```
 
 ::: warning 声明文件命名
 存在 `src/router/index.ts` 时，不要把声明命名为 `src/router.d.ts`，否则它可能遮蔽 `import router from './router'` 的类型解析。本文统一使用 `src/typed-router.d.ts`。

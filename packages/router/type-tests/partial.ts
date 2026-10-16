@@ -1,5 +1,7 @@
 import { useRouter } from '@wot-ui/router'
 
+// @expect:name ["home", "detail"]
+
 declare module '@wot-ui/router' {
   interface RouterTypeConfig {
     name: 'home' | 'detail'

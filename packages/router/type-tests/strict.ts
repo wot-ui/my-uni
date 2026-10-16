@@ -1,5 +1,8 @@
 import { createRouter, useRouter } from '@wot-ui/router'
 
+// @expect:path ["/pages/home", "/shop/detail"]
+// @expect:name ["home", "detail"]
+
 declare module '@wot-ui/router' {
   interface RouterTypeConfig {
     path: '/pages/home' | '/shop/detail'
@@ -29,6 +32,8 @@ useRouter().replaceAll({ name: 'typo' })
 router.push('/pages/typo')
 // @ts-expect-error query 不能绕过路径检查
 router.push('/pages/typo?id=1')
+// @ts-expect-error 字符串路径不支持 hash 片段
+router.push('/pages/home#section')
 // @ts-expect-error 返回值重定向也需要使用已注册名称
 router.beforeEach(() => ({ name: 'typo' }))
 declare const dynamic: string

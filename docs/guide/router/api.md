@@ -117,11 +117,23 @@
 
 从 `@wot-ui/router/typed-routes` 导入，仅供 Node.js 构建配置或脚本使用。
 
+该子入口同时导出以下类型（不从 `@wot-ui/router` 主入口导出）：
+
+| 类型 | 结构与用途 |
+| --- | --- |
+| `RouteTypePage` | 单个页面：`path: string`，可选 `name: string`、`aliasPath: string` |
+| `RouteTypePagesConfig` | 页面集合：可选 `pages` 和 `subPackages`；每个分包包含 `root` 和 `pages` |
+| `RouteTypeOptions` | 生成选项：可选 `strict: boolean`；写入工具额外要求 `dts: string` |
+
+```ts
+import type { RouteTypePage, RouteTypePagesConfig, RouteTypeOptions } from '@wot-ui/router/typed-routes'
+```
+
 ### writeRouteTypes
 
 `writeRouteTypes(config, options): void`
 
-根据页面配置生成声明文件。内容未变化时跳过写入，父目录不存在时自动创建。
+根据页面配置生成声明文件。内容未变化时跳过写入，父目录不存在时自动创建。在同目录写完唯一临时文件后原子替换目标文件；写入或替换失败时尝试清理临时文件，并抛出原始异常。调用方可以补充输出路径等上下文，但应继续抛错，避免使用过期类型。
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
@@ -144,6 +156,10 @@ writeRouteTypes({
 ```
 
 每个页面包含 `path: string`，以及可选的 `name: string`、`aliasPath: string`。主包路径加上前导 `/`，分包路径拼接为 `/${root}/${path}`；别名按配置值原样收集，不拼接分包目录。路径和名称分别去重、排序，没有名称的页面只生成路径类型。
+
+拼接前会去掉 `root` 和 `path` 的首尾斜杠，并过滤空片段。同名对应不同路径时会输出包含名称与冲突路径的警告，但不会中止生成；同名同路径的重复记录不警告。运行时路由表仍由调用方维护，需确保两边的路径一致。
+
+生成声明始终包含 `path` 和 `name`；空集合输出 `never`。严格模式下，无名称页面仍可按路径导航，但不能使用名称导航；完全空的元数据不允许任何路径或名称导航。未开启严格模式时仍接受普通字符串。
 
 ### generateRouteTypes
 
