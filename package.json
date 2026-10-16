@@ -117,7 +117,7 @@
     "@uni-helper/eslint-config": "^0.5.0",
     "@uni-helper/plugin-uni": "^0.1.0",
     "@uni-helper/uni-env": "^0.2.0",
-    "@uni-helper/uni-types": "1.0.0-alpha.6",
+    "@uni-helper/uni-types": "1.4.0",
     "@uni-helper/unocss-preset-uni": "^0.2.11",
     "@uni-helper/vite-plugin-uni-components": "^0.2.3",
     "@uni-helper/vite-plugin-uni-layouts": "^0.1.11",
@@ -148,9 +148,6 @@
   "pnpm": {
     "overrides": {
       "unconfig": "7.3.2"
-    },
-    "patchedDependencies": {
-      "@uni-helper/uni-app-types@1.0.0-alpha.6": "patches/@uni-helper__uni-app-types@1.0.0-alpha.6.patch"
     }
   },
   "lint-staged": {
