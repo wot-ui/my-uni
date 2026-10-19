@@ -6,6 +6,10 @@ import { generateRouteTypes } from '@wot-ui/router/typed-routes'
 import ts from 'typescript'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+function canonicalPath(file) {
+  const normalized = resolve(file.replaceAll('\\', '/')).replaceAll('\\', '/')
+  return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase()
+}
 const options = {
   target: ts.ScriptTarget.ESNext,
   module: ts.ModuleKind.ESNext,
@@ -26,6 +30,7 @@ const generatedConfigs = {
 
 for (const fixture of readdirSync(resolve(root, 'type-tests')).filter(file => /\.[cm]?ts$/.test(file))) {
   const fileName = resolve(root, 'type-tests', fixture)
+  const fixturePath = canonicalPath(fileName)
   const compilerOptions = /\.[cm]ts$/.test(fixture)
     ? { ...options, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext }
     : options
@@ -40,16 +45,18 @@ for (const fixture of readdirSync(resolve(root, 'type-tests')).filter(file => /\
     getScriptFileNames: () => [fileName],
     getScriptVersion: () => '0',
     getScriptSnapshot: (file) => {
-      const text = file === fileName ? source : ts.sys.readFile(file)
+      const text = canonicalPath(file) === fixturePath ? source : ts.sys.readFile(file)
       return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text)
     },
     getCurrentDirectory: () => root,
     getDefaultLibFileName: ts.getDefaultLibFilePath,
   })
   try {
-    const diagnostics = ts.getPreEmitDiagnostics(service.getProgram())
+    const program = service.getProgram()
+    assert.equal(program.getSourceFile(fileName)?.text, source, `${fixture}: language service did not load the fixture snapshot`)
+    const diagnostics = ts.getPreEmitDiagnostics(program)
     assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
-      getCanonicalFileName: file => file,
+      getCanonicalFileName: canonicalPath,
       getCurrentDirectory: () => root,
       getNewLine: () => '\n',
     }))
