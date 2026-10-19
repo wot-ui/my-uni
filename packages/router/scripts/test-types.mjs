@@ -17,8 +17,8 @@ const options = {
 }
 const generatedConfigs = {
   'generated.ts': {
-    pages: [{ path: 'pages/home', name: 'home' }, { path: 'pages/unnamed' }],
-    subPackages: [{ root: 'shop', pages: [{ path: 'detail', name: 'detail' }] }],
+    pages: [{ path: 'pages/home', name: 'home', aliasPath: '/home' }, { path: 'pages/unnamed' }],
+    subPackages: [{ root: 'shop', pages: [{ path: 'detail', name: 'detail', aliasPath: '/product' }] }],
   },
   'generated-empty.ts': {},
   'generated-unnamed.ts': { pages: [{ path: 'pages/unnamed' }] },

@@ -103,6 +103,8 @@
 
 ## 路由补全类型
 
+以下补全类型及生成工具尚未发布，已发布的 `1.1.2` 不包含这些 API。源码接入见[路径与名称补全](./typed-routes.md)。
+
 以下类型从 `@wot-ui/router` 导出：
 
 | 类型 | 用途 |
@@ -135,6 +137,8 @@ import type { RouteTypePage, RouteTypePagesConfig, RouteTypeOptions } from '@wot
 
 根据页面配置生成声明文件。内容未变化时跳过写入，父目录不存在时自动创建。在同目录写完唯一临时文件后原子替换目标文件；写入或替换失败时尝试清理临时文件，并抛出原始异常。调用方可以补充输出路径等上下文，但应继续抛错，避免使用过期类型。
 
+Windows 的替换操作遇到 `EPERM` / `EACCES` 时，间隔 10、20、40、80ms 重试，最多尝试 5 次。同步钩子最多额外等待 150ms，超过上限继续抛错；其他错误和平台不重试。
+
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
 | `config` | `RouteTypePagesConfig` | 页面配置，结构见下方示例；调用方应提供与运行时路由一致的数据 |
@@ -166,6 +170,8 @@ writeRouteTypes({
 `generateRouteTypes(config, options?): string`
 
 接收相同的页面配置，返回声明文本，不写入文件。`options` 仅包含可选的 `strict`，适合已有文件生成流程的项目。
+
+候选值按字典序排列，每行输出一个字面量，便于审阅页面增删。生成文件为 import 和模块增强声明分别添加 `prettier-ignore`，防止格式化后再次生成导致文件反复变化。
 
 这两个工具不负责扫描页面、解析 `pages.json` 或监听文件变化。使用 uni-pages 时可按[自动生成步骤](./typed-routes.md#auto-setup)接入；其他项目需自行读取配置并在变化后重新调用。带注释或条件编译的页面配置应先由对应工具解析，再传入生成器。
 

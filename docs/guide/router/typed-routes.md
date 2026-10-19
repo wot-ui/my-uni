@@ -1,5 +1,9 @@
 # 路径与名称补全
 
+::: warning 发布状态：未发布
+本页介绍的是尚未发布的新功能。已发布的 `@wot-ui/router@1.1.2` 不包含 `RouterTypeConfig` 和 `@wot-ui/router/typed-routes` 入口；请勿直接用该版本照搬下面的配置。源码开发可按下文先构建 router，正式发布时会补充首个支持版本。
+:::
+
 配置后，在 TypeScript 代码中输入路由的 `path` 或 `name`，编辑器就能列出项目里的候选值。直接导入的 router 和 `useRouter()` 都支持，原有导航写法不用改。
 
 ```ts
@@ -88,6 +92,8 @@ export default defineConfig({
 
 合并配置时保留项目已有的其他插件、`subPackages` 和 `exclude` 等选项。不要重复注册 uni-pages；如果已有 `onBeforeWriteFile`，把 `writeRouteTypes(...)` 加入原来的回调。
 
+这里使用 `onBeforeWriteFile`，因为 uni-pages 在 `pages.json` 内容不变时可能跳过 `onAfterWriteFile`。前置钩子能确保声明缺失或生成选项改变时仍有机会更新。声明与 `pages.json` 并非一次原子事务；任一步失败都应修复原因并重新生成，不应忽略错误继续构建。
+
 两个 `dts` 配置负责不同的声明文件：
 
 | 配置 | 生成的文件 | 用途 |
@@ -99,11 +105,17 @@ export default defineConfig({
 
 ### 3. 启动项目并确认生效
 
-重启开发服务，或执行一次构建。例如本仓库使用：
+安装包含该功能的已发布 router 包后，重启开发服务或执行一次构建即可。
+
+**直接开发本仓库时，首次检出或删除 `packages/router/dist` 后，应先构建 workspace 中的 router 包，再启动示例项目：**
 
 ```sh
+pnpm install --frozen-lockfile
+pnpm build:router
 pnpm dev:h5
 ```
+
+`vite.config.ts` 在加载时就会导入 `@wot-ui/router/typed-routes`，因此构建 router 必须在启动 Vite 之前完成。仅修改 router 源码后也要重新构建，或另外运行 `pnpm dev:router` 持续更新产物。
 
 确认 `src/typed-router.d.ts` 已生成，其中应能找到刚配置的 `home` 和 `/pages/index/index`。**这个文件由工具维护，不要手动编辑，也不需要在页面里 import 它。**
 
@@ -240,9 +252,31 @@ router.push({ name: target })
 
 严格模式不接受未经收窄的 `string`。需要保持原有动态跳转写法时，先使用默认补全模式；确认业务数据范围后，再逐步为变量补充类型或验证逻辑。
 
+### 严格模式下，to.fullPath 或 useRoute().path 不能直接回传
+
+守卫参数 `to`、`from` 和 `useRoute()` 返回的是运行时路由信息，其 `path`、`fullPath` 保持 `string`。它们可能是初始空地址或参数展开后的地址，如 `/pages/detail/1`，不能保证属于注册的 `/pages/detail/:id` 等字面量联合。
+
+守卫正常放行应直接调用 `next()` 或返回 `true`，无需再次导航到 `to.fullPath`。需要暂存地址并在登录后恢复时，优先验证并收窄路径；只有调用方已确认地址有效、且实际路由解析支持该地址时，才使用显式断言：
+
+```ts
+import type { RouteLocationNormalized, RoutePath } from '@wot-ui/router'
+import { useRouter } from '@wot-ui/router'
+
+const router = useRouter()
+
+function restoreConfirmedRoute(saved: RouteLocationNormalized) {
+  // 前提：业务已验证 saved.fullPath 可用；不要对接口或用户输入直接断言。
+  return router.replace(saved.fullPath as RoutePath)
+}
+```
+
+`as RoutePath` 只跳过这一次编译期约束，不做运行时校验，也不增加动态路径匹配能力。默认补全模式下不需要该断言。
+
 ### 声明写入失败，开发服务或构建中断
 
 检查 `dts` 指向的目录是否可写、目标是否被其他程序占用。写入使用同目录临时文件，完整写入后才替换目标；写入或替换失败会保留原文件并尝试清理临时文件。清理失败时可能留下 `.tmp` 文件，但不会覆盖最初的异常。进程被强制终止时也可能留下临时文件。
+
+Windows 上替换目标时遇到 `EPERM` 或 `EACCES`，会间隔 10、20、40、80ms 重试，最多尝试 5 次，额外同步等待总计不超过 150ms。其他平台或错误不重试；超出上限仍会抛错。开发和构建使用相同规则，避免静默保留过期类型。
 
 异常会向调用方抛出，避免构建继续使用过期的路由类型。如需更明确的诊断，可以在钩子中补充输出路径并重新抛出原始异常，不要捕获后忽略：
 
