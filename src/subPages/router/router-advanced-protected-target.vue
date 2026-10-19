@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePage({
-  name: 'advanced-protected-target',
+  name: 'router-advanced-protected-target',
   style: {
     navigationBarTitleText: '受保护页面',
   },

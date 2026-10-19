@@ -7,6 +7,7 @@
  * @FilePath: /my-uni/vite.config.ts
  * 记得注释
  */
+import { resolve } from 'node:path'
 import process from 'node:process'
 import Uni from '@uni-helper/plugin-uni'
 import UniHelperComponents from '@uni-helper/vite-plugin-uni-components'
@@ -16,6 +17,7 @@ import UniHelperManifest from '@uni-helper/vite-plugin-uni-manifest'
 import UniHelperPages from '@uni-helper/vite-plugin-uni-pages'
 import Optimization from '@uni-ku/bundle-optimizer'
 import UniKuRoot from '@uni-ku/root'
+import { writeRouteTypes } from '@wot-ui/router/typed-routes'
 import { UniEchartsResolver } from 'uni-echarts/resolver'
 import { UniEcharts } from 'uni-echarts/vite'
 import UnoCSS from 'unocss/vite'
@@ -33,6 +35,12 @@ export default defineConfig({
     // https://github.com/uni-helper/vite-plugin-uni-pages
     UniHelperPages({
       dts: 'src/uni-pages.d.ts',
+      onBeforeWriteFile(ctx) {
+        writeRouteTypes({
+          pages: ctx.pageMetaData,
+          subPackages: ctx.subPageMetaData,
+        }, { dts: resolve(ctx.root, 'src/typed-router.d.ts') })
+      },
       subPackages: [
         'src/subPages',
         'src/subEcharts',

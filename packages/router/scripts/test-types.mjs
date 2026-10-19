@@ -1,0 +1,86 @@
+import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { generateRouteTypes } from '@wot-ui/router/typed-routes'
+import ts from 'typescript'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+function canonicalPath(file) {
+  const normalized = resolve(file.replaceAll('\\', '/')).replaceAll('\\', '/')
+  return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase()
+}
+const options = {
+  target: ts.ScriptTarget.ESNext,
+  module: ts.ModuleKind.ESNext,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  strict: true,
+  skipLibCheck: false,
+  noEmit: true,
+  types: [],
+}
+const generatedConfigs = {
+  'generated.ts': {
+    pages: [{ path: 'pages/home', name: 'home', aliasPath: '/home' }, { path: 'pages/unnamed' }],
+    subPackages: [{ root: 'shop', pages: [{ path: 'detail', name: 'detail', aliasPath: '/product' }] }],
+  },
+  'generated-empty.ts': {},
+  'generated-unnamed.ts': { pages: [{ path: 'pages/unnamed' }] },
+}
+
+for (const fixture of readdirSync(resolve(root, 'type-tests')).filter(file => /\.[cm]?ts$/.test(file))) {
+  const fileName = resolve(root, 'type-tests', fixture)
+  const fixturePath = canonicalPath(fileName)
+  const compilerOptions = /\.[cm]ts$/.test(fixture)
+    ? { ...options, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext }
+    : options
+  let source = readFileSync(fileName, 'utf8')
+  const expected = Object.fromEntries([...source.matchAll(/^\/\/ @expect:(path|name) (.+)$/gm)]
+    .map(([, key, values]) => [key, JSON.parse(values)]))
+  if (Object.hasOwn(generatedConfigs, fixture))
+    source += generateRouteTypes(generatedConfigs[fixture], { strict: true })
+  const service = ts.createLanguageService({
+    ...ts.sys,
+    getCompilationSettings: () => compilerOptions,
+    getScriptFileNames: () => [fileName],
+    getScriptVersion: () => '0',
+    getScriptSnapshot: (file) => {
+      const text = canonicalPath(file) === fixturePath ? source : ts.sys.readFile(file)
+      return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text)
+    },
+    getCurrentDirectory: () => root,
+    getDefaultLibFileName: ts.getDefaultLibFilePath,
+  })
+  try {
+    const program = service.getProgram()
+    assert.equal(program.getSourceFile(fileName)?.text, source, `${fixture}: language service did not load the fixture snapshot`)
+    const diagnostics = ts.getPreEmitDiagnostics(program)
+    assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+      getCanonicalFileName: canonicalPath,
+      getCurrentDirectory: () => root,
+      getNewLine: () => '\n',
+    }))
+    let offset = 0
+    let checks = 0
+    const checked = new Set()
+    for (const line of source.split('\n')) {
+      const marker = line.match(/\/\/ @complete:(path|name)/)
+      if (marker) {
+        const position = offset + line.lastIndexOf('\'', marker.index)
+        const completions = service.getCompletionsAtPosition(fileName, position, {})
+        const names = completions?.entries.filter(entry => entry.kind === ts.ScriptElementKind.string).map(entry => entry.name) ?? []
+        const key = marker[1]
+        assert.ok(Object.hasOwn(expected, key), `${fixture}: missing @expect:${key}`)
+        assert.deepEqual(names.sort(), [...expected[key]].sort(), `${fixture}: unexpected ${key} completions for ${line}`)
+        checked.add(key)
+        checks++
+      }
+      offset += line.length + 1
+    }
+    assert.deepEqual([...checked].sort(), Object.keys(expected).sort(), `${fixture}: unused completion expectations`)
+    console.log(`${fixture}: type checks passed, ${checks} completion checks passed`)
+  }
+  finally {
+    service.dispose()
+  }
+}

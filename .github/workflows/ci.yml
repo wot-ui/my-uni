@@ -9,6 +9,7 @@ on:
 jobs:
   build-and-test:
     runs-on: windows-latest
+    timeout-minutes: 20
 
     strategy:
       matrix:
@@ -46,45 +47,24 @@ jobs:
         run: pnpm -r install --frozen-lockfile
 
       - name: Run unit tests for router package
-        run: pnpm -F @wot-ui/router test -- --run
+        run: pnpm -F @wot-ui/router exec vitest run
 
-      - name: Upload test coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-coverage
-          path: packages/router/coverage/
-          retention-days: 7
-        if: always()
+      # test:types builds the published entries before testing their types and completions.
+      - name: Build and type-test router package
+        run: pnpm -F @wot-ui/router test:types
 
-      - name: Test WeChat Mini Program dev mode
-        shell: bash
-        run: |
-          echo "Testing WeChat Mini Program dev mode startup..."
-          timeout 30s pnpm dev:mp-weixin || true
-          echo "✅ WeChat Mini Program dev mode test completed"
+      # This invokes uni-pages and regenerates src/typed-router.d.ts.
+      - name: Build H5
+        run: pnpm build:h5
 
-      - name: Test H5 dev mode
-        shell: bash
-        run: |
-          echo "Testing H5 dev mode startup..."
-          timeout 30s pnpm dev:h5 || true
-          echo "✅ H5 dev mode test completed"
+      - name: Ensure generated route types are up to date
+        run: git diff --exit-code -- src/typed-router.d.ts
 
-      - name: Test iOS dev mode
-        shell: bash
-        run: |
-          echo "Testing iOS dev mode startup..."
-          timeout 30s pnpm dev:app-ios || true
-          echo "✅ iOS dev mode test completed"
-
-      - name: Build Router Package
-        run: pnpm build:router
+      - name: Type check demo app
+        run: pnpm type-check
 
       - name: Build WeChat Mini Program
         run: pnpm build:mp-weixin
-
-      - name: Build H5
-        run: pnpm build:h5
 
       - name: Build iOS
         run: pnpm build:app-ios
@@ -110,18 +90,6 @@ jobs:
           path: dist/build/app-ios/
           retention-days: 7
 
-      - name: Build summary
-        run: |
-          echo "## Build and Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "### Development Mode Tests" >> $GITHUB_STEP_SUMMARY
-          echo "✅ WeChat Mini Program dev mode test completed" >> $GITHUB_STEP_SUMMARY
-          echo "✅ H5 dev mode test completed" >> $GITHUB_STEP_SUMMARY
-          echo "✅ iOS dev mode test completed" >> $GITHUB_STEP_SUMMARY
-          echo "### Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ WeChat Mini Program build completed" >> $GITHUB_STEP_SUMMARY
-          echo "✅ H5 build completed" >> $GITHUB_STEP_SUMMARY
-          echo "✅ iOS build completed" >> $GITHUB_STEP_SUMMARY
-          echo "📦 All artifacts uploaded successfully" >> $GITHUB_STEP_SUMMARY
       - name: Build Docs (VitePress)
         run: pnpm -C docs run docs:build
 
@@ -131,3 +99,11 @@ jobs:
           name: docs-build
           path: docs/.vitepress/dist/
           retention-days: 7
+
+      - name: Build summary
+        shell: bash
+        run: |
+          echo "## Build and Test Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Router unit tests, package build and type/completion tests passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Demo app type check and generated route declaration check passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ WeChat Mini Program, H5, iOS and docs builds completed" >> "$GITHUB_STEP_SUMMARY"

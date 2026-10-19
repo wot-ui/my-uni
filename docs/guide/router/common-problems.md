@@ -18,6 +18,14 @@
 - 非API返回：非API返回跳转未使用路由API，故无法拦截。
 
 
+## path、name 没有可选值提示？
+
+需要先[接入路径与名称补全](./typed-routes.md)。使用 uni-pages 时，增加生成钩子后要重启开发服务，并确认生成的 `src/typed-router.d.ts` 被 TypeScript 包含。已有声明仍没有提示时，见[排查步骤](./typed-routes.md#troubleshooting)。
+
+## 为什么路由名称拼错了没有类型错误？
+
+默认模式只提供候选值，同时兼容动态字符串。需要在编译时限制路径、名称时，请开启[严格模式](./typed-routes.md#strict-mode)。
+
 ## 关于我们
 
 **如果您的问题不在上述列表中或您有更好的建议，请联系我们 [Moonofweisheng](https://github.com/wot-ui/my-uni)**

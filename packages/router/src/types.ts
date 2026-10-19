@@ -1439,9 +1439,27 @@ export interface RouteLocationNormalized {
   [x: string]: any
 }
 
+/**
+ * 应用可通过模块增强注册 path、name 字面量联合，以及 strict: true。
+ * 未注册时保持 string；默认提供补全且允许动态字符串。
+ */
+export interface RouterTypeConfig {}
+
+type RegisteredRouteValue<Key extends 'path' | 'name'>
+  = RouterTypeConfig extends Record<Key, infer Value extends string> ? Value : string
+
+type RouteValue<Value extends string> = RouterTypeConfig extends { strict: true }
+  ? Value
+  : Value | (string & {})
+
+/** 导航路径，包含已注册路径和携带 query 的地址。 */
+export type RoutePath = RouteValue<RegisteredRouteValue<'path'> | `${RegisteredRouteValue<'path'>}?${string}`>
+/** 导航名称。 */
+export type RouteName = RouteValue<RegisteredRouteValue<'name'>>
+
 export interface RouteLocationObject extends RouteNavigationOptions {
-  path?: string
-  name?: string
+  path?: RoutePath
+  name?: RouteName
   params?: RouteParams
   query?: LocationQuery
   hash?: string
@@ -1449,7 +1467,7 @@ export interface RouteLocationObject extends RouteNavigationOptions {
   navType?: NavType // 扩展：支持指定跳转方式
 }
 
-export type RouteLocationRaw = string | RouteLocationObject
+export type RouteLocationRaw = RoutePath | RouteLocationObject
 
 export interface RouterOptions {
   routes: RouteRecordRaw[]

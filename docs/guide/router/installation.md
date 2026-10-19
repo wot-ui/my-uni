@@ -7,6 +7,10 @@
 
 ## 安装路由包
 
+::: warning 路由补全功能的版本范围
+本页的安装命令用于已发布的 router。新的路径与名称补全功能尚未发布，已发布的 `1.1.2` 不包含 `@wot-ui/router/typed-routes` 入口。源码体验与构建步骤见[路径与名称补全](./typed-routes.md#auto-setup)；正式发布后会在该指南标明首个支持版本。
+:::
+
 ::: code-group
 ```bash [pnpm]
 pnpm add @wot-ui/router

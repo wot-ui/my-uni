@@ -25,6 +25,7 @@
     "src/**/*.d.ts",
     "src/**/*.tsx",
     "src/**/*.vue",
+    "type-tests/**/*.ts",
     "async-import.d.ts",
     "async-component.d.ts"
   ],

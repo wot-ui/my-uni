@@ -21,6 +21,16 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./typed-routes": {
+      "import": {
+        "types": "./dist/typed-routes.d.mts",
+        "default": "./dist/typed-routes.mjs"
+      },
+      "require": {
+        "types": "./dist/typed-routes.d.cts",
+        "default": "./dist/typed-routes.cjs"
+      }
     }
   },
   "main": "dist/index.js",
@@ -39,6 +49,7 @@
     "lint:fix": "pnpm --workspace-root exec eslint packages/router/src --fix",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:types": "pnpm build && node scripts/test-types.mjs",
     "test:coverage": "vitest --coverage"
   },
   "peerDependencies": {
@@ -70,6 +81,7 @@
     "ts-jest": "^29.0.5",
     "tsdown": "^0.18.2",
     "typescript": "~5.5.4",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.16",
+    "vue": "~3.4.38"
   }
 }

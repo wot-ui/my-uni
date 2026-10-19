@@ -2,6 +2,8 @@
 
 ## 编程式导航
 
+想在输入 `path`、`name` 时看到可选值，可以先按[路径与名称补全](./typed-routes.md)配置类型声明。下方的导航调用方式不变。
+
 >注意：这里`name` 和 `params`搭配使用，而`path` 可以与 `query` 一起使用。
 
 ### 基础用法
@@ -48,8 +50,8 @@ router.push({ path: '/user', hash: '#section' })
 
 | 属性 | 类型 | 描述 |
 | --- | --- | --- |
-| path | `string` | 路由路径 |
-| name | `string` | 路由名称 |
+| path | `RoutePath` | 路由路径；注册类型后提供候选值，默认仍兼容普通字符串 |
+| name | `RouteName` | 路由名称；注册类型后提供候选值，默认仍兼容普通字符串 |
 | params | `RouteParams` | 路由参数（与 name 搭配使用） |
 | query | `LocationQuery` | 查询参数（与 path 搭配使用） |
 | hash | `string` | URL hash 值 |
