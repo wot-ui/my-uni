@@ -6,7 +6,11 @@ export type LocationQueryValue = string | number | null | undefined
 export type LocationQuery = Record<string, LocationQueryValue | Exclude<LocationQueryValue, null | undefined>[]>
 export type RouteMeta = Record<string | number | symbol, unknown>
 
-export type AnimationType = 'auto' | 'none' | 'slide-out-right' | 'slide-out-left' | 'slide-out-top' | 'slide-out-bottom' | 'fade-out' | 'zoom-in' | 'zoom-fade-in' | 'pop-out'
+/** 窗口显示动画，用于页面打开及 pages.json 的窗口配置。 */
+export type AnimationType = 'auto' | 'none' | 'slide-in-right' | 'slide-in-left' | 'slide-in-top' | 'slide-in-bottom' | 'fade-in' | 'zoom-out' | 'zoom-fade-out' | 'pop-in'
+
+/** 窗口关闭动画，用于返回上一页面。 */
+export type AnimationBackType = 'auto' | 'none' | 'slide-out-right' | 'slide-out-left' | 'slide-out-top' | 'slide-out-bottom' | 'fade-out' | 'zoom-in' | 'zoom-fade-in' | 'pop-out'
 
 export type RGBAColor = `rgba(${number}, ${number}, ${number}, ${number})`
 export type HEXColor = `#${string}`
@@ -19,12 +23,14 @@ export interface RouteLocationBase {
   animationDuration?: number
 }
 
-export interface RouteBackLocation extends RouteLocationBase {
+export interface RouteBackLocation {
+  animationType?: AnimationBackType
+  animationDuration?: number
   delta?: number
 }
 
 export interface RouteNavigationOptions {
-  animationType?: string
+  animationType?: AnimationType | AnimationBackType
   animationDuration?: number
   delta?: number
 }
@@ -1457,15 +1463,20 @@ export type RoutePath = RouteValue<RegisteredRouteValue<'path'> | `${RegisteredR
 /** 导航名称。 */
 export type RouteName = RouteValue<RegisteredRouteValue<'name'>>
 
-export interface RouteLocationObject extends RouteNavigationOptions {
+interface RouteLocationObjectBase extends Omit<RouteNavigationOptions, 'animationType'> {
   path?: RoutePath
   name?: RouteName
   params?: RouteParams
   query?: LocationQuery
   hash?: string
   replace?: boolean
-  navType?: NavType // 扩展：支持指定跳转方式
 }
+
+/** 根据实际导航方式区分显示动画和关闭动画。 */
+export type RouteLocationObject = RouteLocationObjectBase & (
+  | { navType?: Exclude<NavType, 'back'>, animationType?: AnimationType }
+  | { navType: 'back', animationType?: AnimationBackType }
+)
 
 export type RouteLocationRaw = RoutePath | RouteLocationObject
 
