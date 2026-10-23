@@ -16,6 +16,12 @@ router.push({ path: '/pages/home' }) // @complete:path
 useRouter().replace({ name: 'home' }) // @complete:name
 router.push('/pages/home') // @complete:path
 router.push('/shop/detail?id=1')
+router.push({ path: '/pages/home', animationType: 'pop-in' })
+router.push({ name: 'home', navType: 'back', animationType: 'pop-out' })
+// @ts-expect-error 返回导航仍然校验注册的路由名称
+router.push({ name: 'typo', navType: 'back', animationType: 'pop-out' })
+// @ts-expect-error 严格模式同样校验动画方向
+router.push({ name: 'home', navType: 'back', animationType: 'pop-in' })
 router.push({ path: '/shop/detail?id=1', query: { other: 2 } })
 router.beforeEach(() => ({ name: 'home' }))
 router.beforeEach(async () => ({ path: '/pages/home' }))

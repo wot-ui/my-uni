@@ -246,16 +246,15 @@ function copyCode(code: string) {
 
         <view class="rounded-2 bg-white p-4 dark:bg-[var(--wot-dark-background2)]">
           <view class="mb-3 text-4 text-gray-800 font-bold dark:text-[var(--wot-dark-color)]">
-            RouterBackRaw
+            RouteBackRaw
           </view>
           <view class="border border-gray-200 rounded-2 bg-gray-50 p-3 dark:border-[var(--wot-dark-border)] dark:bg-[var(--wot-dark-background3)]">
             <text class="text-3 text-gray-700 leading-relaxed font-mono dark:text-[var(--wot-dark-color)]">
-              type RouterBackRaw = number | RouteBackLocation
+              type RouteBackRaw = number | RouteBackLocation
 
               interface RouteBackLocation {
               delta?: number
-              url?: string
-              animationType?: AnimationType
+              animationType?: AnimationBackType
               animationDuration?: number
               }
             </text>

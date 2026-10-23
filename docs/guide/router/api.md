@@ -98,7 +98,7 @@
 | 属性 | 类型 | 描述 |
 | --- | --- | --- |
 | delta | `number` | 返回的页面数，默认值为 `1` |
-| animationType | `AnimationType` | 窗口动画类型 |
+| animationType | `AnimationBackType` | 窗口关闭动画类型，例如 `slide-out-right`、`pop-out` |
 | animationDuration | `number` | 窗口动画持续时间，单位为 ms |
 
 ## 路由补全类型
