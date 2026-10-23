@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getUrlParams, isEmptyObject, normalizeUrl, stringifyQuery } from '../utils'
 
 describe('getUrlParams - URL 参数解析', () => {
@@ -24,6 +24,18 @@ describe('getUrlParams - URL 参数解析', () => {
   it('应该解码 URL 编码的值', () => {
     const result = getUrlParams('/pages/index?name=%E6%B5%8B%E8%AF%95')
     expect(result).toEqual({ name: '测试' })
+  })
+
+  it('解码非法 percent-encoding 失败时应该记录错误并保留原始键值', () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = getUrlParams('/pages/index?bad%key=bad%value')
+
+    expect(consoleErrorSpy).toHaveBeenCalledOnce()
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(URIError))
+    expect(result).toEqual({ 'bad%key': 'bad%value' })
+
+    consoleErrorSpy.mockRestore()
   })
 
   it('应该处理键中的特殊字符', () => {

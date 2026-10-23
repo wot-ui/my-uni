@@ -18,7 +18,8 @@ export function getUrlParams(path: string): Record<string, string> {
       try {
         params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : ''
       }
-      catch {
+      catch (error) {
+        console.error(error)
         params[key] = value || ''
       }
     }
