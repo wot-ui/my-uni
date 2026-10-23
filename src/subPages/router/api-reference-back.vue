@@ -124,7 +124,7 @@ function backWithAnimation() {
             <text class="text-3 text-gray-700 leading-relaxed font-mono dark:text-[var(--wot-dark-color)]">
               router.back({
               delta: 1,
-              animationType: 'slide-in-bottom',
+              animationType: 'slide-out-bottom',
               animationDuration: 300
               })
             </text>
@@ -140,16 +140,15 @@ function backWithAnimation() {
       <view class="space-y-3">
         <view class="rounded-2 bg-white p-4 dark:bg-[var(--wot-dark-background2)]">
           <view class="mb-3 text-4 text-gray-800 font-bold dark:text-[var(--wot-dark-color)]">
-            RouterBackRaw 类型
+            RouteBackRaw 类型
           </view>
           <view class="border border-gray-200 rounded-2 bg-gray-50 p-3 dark:border-[var(--wot-dark-border)] dark:bg-[var(--wot-dark-background3)]">
             <text class="text-3 text-gray-700 leading-relaxed font-mono dark:text-[var(--wot-dark-color)]">
-              type RouterBackRaw = number | RouteBackLocation
+              type RouteBackRaw = number | RouteBackLocation
 
               interface RouteBackLocation {
               delta?: number
-              url?: string
-              animationType?: AnimationType
+              animationType?: AnimationBackType
               animationDuration?: number
               }
             </text>
@@ -158,20 +157,19 @@ function backWithAnimation() {
 
         <view class="rounded-2 bg-white p-4 dark:bg-[var(--wot-dark-background2)]">
           <view class="mb-3 text-4 text-gray-800 font-bold dark:text-[var(--wot-dark-color)]">
-            AnimationType 类型
+            AnimationBackType 类型
           </view>
           <view class="border border-gray-200 rounded-2 bg-gray-50 p-3 dark:border-[var(--wot-dark-border)] dark:bg-[var(--wot-dark-background3)]">
             <text class="text-3 text-gray-700 leading-relaxed font-mono dark:text-[var(--wot-dark-color)]">
-              type AnimationType =
+              type AnimationBackType =
               | 'auto'
               | 'none'
-              | 'slide-in-right'
-              | 'slide-in-left'
-              | 'slide-in-top'
-              | 'slide-in-bottom'
-              | 'pop-in'
+              | 'slide-out-right'
+              | 'slide-out-left'
+              | 'slide-out-top'
+              | 'slide-out-bottom'
               | 'pop-out'
-              | 'fade-in'
+              | 'fade-out'
               | 'zoom-in'
               | 'zoom-fade-in'
             </text>
