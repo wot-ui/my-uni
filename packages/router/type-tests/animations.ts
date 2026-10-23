@@ -28,9 +28,26 @@ router.beforeEach((_to, _from, next) => next({ name: 'home', animationType: 'pop
 
 const base: RouteLocationBase = { animationType: show }
 const back: RouteBackLocation = { animationType: close }
-const navigation: RouteNavigationOptions = back
+const navigation: RouteNavigationOptions = { ...back, navType: 'back' }
+const openingOptions: RouteNavigationOptions = { animationType: 'pop-in', animationDuration: 300 }
+router.push({ path: '/pages/home', ...openingOptions })
+router.push({ path: '/pages/home', ...navigation })
+router.back(navigation)
+// 未知方向的配置也应保留 navType 与 animationType 的对应关系。
+declare const sharedOptions: RouteNavigationOptions
+const composedLocation: RouteLocationObject = { path: '/pages/home', ...sharedOptions }
+router.push(composedLocation)
+router.beforeEach(() => ({ name: 'home', ...sharedOptions }))
 const route: RouteRecordRaw = { path: '/pages/home', style: { 'animationType': show, 'app-plus': { animationType: show } } }
 void [base, navigation, route]
+
+// @ts-expect-error 关闭动画的可复用配置必须显式声明返回方向
+const missingDirection: RouteNavigationOptions = { animationType: 'pop-out' }
+// @ts-expect-error 配置对象自身也应拒绝方向混用
+const wrongDirection: RouteNavigationOptions = { navType: 'back', animationType: 'pop-in' }
+// @ts-expect-error 不能用展开的返回配置覆盖成前进方向
+router.push({ path: '/pages/home', ...navigation, navType: 'push' })
+void [missingDirection, wrongDirection]
 
 // @ts-expect-error 页面打开不接受关闭动画
 router.push({ path: '/pages/home', animationType: 'slide-out-right' })

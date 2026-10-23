@@ -75,7 +75,18 @@ router.back({ animationType: 'slide-out-right' })
 router.push({ path: '/user', navType: 'back', animationType: 'slide-out-right' })
 ```
 
-`RouteBackLocation` 不再继承 `RouteLocationBase`。`RouteLocationObject` 改为按 `navType` 区分动画类型的联合类型；需要扩展它时，使用交叉类型（如 `RouteLocationObject & { custom: string }`），不再使用 `interface extends RouteLocationObject`。
+可复用的导航配置使用 `RouteNavigationOptions`，展开到导航参数中时会保留动画方向。显示动画配置可以省略 `navType`，关闭动画配置必须带上 `navType: 'back'`：
+
+```ts
+import type { RouteNavigationOptions } from '@wot-ui/router'
+
+const opening: RouteNavigationOptions = { animationType: 'pop-in', animationDuration: 300 }
+const closing: RouteNavigationOptions = { navType: 'back', animationType: 'pop-out', delta: 1 }
+router.push({ path: '/user', ...opening })
+router.push({ path: '/user', ...closing })
+```
+
+`RouteBackLocation` 不再继承 `RouteLocationBase`。`RouteNavigationOptions` 和 `RouteLocationObject` 改为按 `navType` 区分动画类型的联合类型；需要扩展它们时，使用交叉类型（如 `RouteLocationObject & { custom: string }`），不再使用 `interface extends`。
 
 ### RouteRecordRaw 路由配置说明
 

@@ -29,11 +29,14 @@ export interface RouteBackLocation {
   delta?: number
 }
 
-export interface RouteNavigationOptions {
-  animationType?: AnimationType | AnimationBackType
+/** 可复用的导航配置；返回配置必须通过 navType 保留动画方向。 */
+export type RouteNavigationOptions = {
   animationDuration?: number
   delta?: number
-}
+} & (
+  | { navType?: Exclude<NavType, 'back'>, animationType?: AnimationType }
+  | { navType: 'back', animationType?: AnimationBackType }
+)
 
 export interface RouteRecordRaw {
   /**
@@ -1463,7 +1466,7 @@ export type RoutePath = RouteValue<RegisteredRouteValue<'path'> | `${RegisteredR
 /** 导航名称。 */
 export type RouteName = RouteValue<RegisteredRouteValue<'name'>>
 
-interface RouteLocationObjectBase extends Omit<RouteNavigationOptions, 'animationType'> {
+interface RouteLocationObjectBase {
   path?: RoutePath
   name?: RouteName
   params?: RouteParams
@@ -1473,10 +1476,7 @@ interface RouteLocationObjectBase extends Omit<RouteNavigationOptions, 'animatio
 }
 
 /** 根据实际导航方式区分显示动画和关闭动画。 */
-export type RouteLocationObject = RouteLocationObjectBase & (
-  | { navType?: Exclude<NavType, 'back'>, animationType?: AnimationType }
-  | { navType: 'back', animationType?: AnimationBackType }
-)
+export type RouteLocationObject = RouteLocationObjectBase & RouteNavigationOptions
 
 export type RouteLocationRaw = RoutePath | RouteLocationObject
 
