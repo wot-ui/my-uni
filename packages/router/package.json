@@ -1,7 +1,7 @@
 {
   "name": "@wot-ui/router",
   "type": "module",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "packageManager": "pnpm@9.9.0",
   "description": "轻量级 uni-app vue3 路由库",
   "license": "MIT",
