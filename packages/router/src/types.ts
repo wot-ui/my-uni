@@ -3,7 +3,7 @@ import type { App, Ref } from 'vue'
 export type RouteParams = Record<string, string | string[]>
 
 export type LocationQueryValue = string | number | null | undefined
-export type LocationQuery = Record<string, LocationQueryValue | Exclude<LocationQueryValue, null | undefined>[]>
+export type LocationQuery = Record<string, LocationQueryValue | Exclude<LocationQueryValue, undefined>[]>
 export type RouteMeta = Record<string | number | symbol, unknown>
 
 /** 窗口显示动画，用于页面打开及 pages.json 的窗口配置。 */
