@@ -57,9 +57,36 @@ router.push({ path: '/user', hash: '#section' })
 | hash | `string` | URL hash 值 |
 | replace | `boolean` | 是否使用 replace 方式跳转 |
 | navType | `NavType` | 跳转类型：`'push'` \| `'replace'` \| `'replaceAll'` \| `'pushTab'` \| `'back'` |
-| animationType | `string` | 窗口动画类型；普通跳转使用入场动画，`navType: 'back'` 时使用退场动画 |
+| animationType | `AnimationType` / `AnimationBackType` | 普通跳转使用显示动画，`navType: 'back'` 时使用关闭动画；仅 App 支持窗口动画 |
 | animationDuration | `number` | 窗口动画持续时间，单位为 ms |
 | delta | `number` | `navType: 'back'` 时返回的页面数 |
+
+### 动画类型迁移
+
+`AnimationType` 使用显示动画：`slide-in-right`、`slide-in-left`、`slide-in-top`、`slide-in-bottom`、`fade-in`、`zoom-out`、`zoom-fade-out`、`pop-in`、`none`、`auto`。`pages.json` 的窗口配置也使用这些值。
+
+`router.back()` 和 `navType: 'back'` 使用 `AnimationBackType`：`slide-out-right`、`slide-out-left`、`slide-out-top`、`slide-out-bottom`、`fade-out`、`zoom-in`、`zoom-fade-in`、`pop-out`、`none`、`auto`。动画名称对应关系见 [uni-app 窗口动画](https://uniapp.dcloud.net.cn/api/router.html#animation)。
+
+此前使用关闭动画作为打开动画的代码需要更换为对应的显示动画；返回操作的动画值保持不变。显式以 `AnimationType` 标注返回动画的代码需改用 `AnimationBackType`，普通 `string` 类型的动画变量需收窄为对应联合类型。
+
+```ts
+router.push({ path: '/user', animationType: 'slide-in-right' })
+router.back({ animationType: 'slide-out-right' })
+router.push({ path: '/user', navType: 'back', animationType: 'slide-out-right' })
+```
+
+可复用的导航配置使用 `RouteNavigationOptions`，展开到导航参数中时会保留动画方向。显示动画配置可以省略 `navType`，关闭动画配置必须带上 `navType: 'back'`：
+
+```ts
+import type { RouteNavigationOptions } from '@wot-ui/router'
+
+const opening: RouteNavigationOptions = { animationType: 'pop-in', animationDuration: 300 }
+const closing: RouteNavigationOptions = { navType: 'back', animationType: 'pop-out', delta: 1 }
+router.push({ path: '/user', ...opening })
+router.push({ path: '/user', ...closing })
+```
+
+`RouteBackLocation` 不再继承 `RouteLocationBase`。`RouteNavigationOptions` 和 `RouteLocationObject` 改为按 `navType` 区分动画类型的联合类型；需要扩展它们时，使用交叉类型（如 `RouteLocationObject & { custom: string }`），不再使用 `interface extends`。
 
 ### RouteRecordRaw 路由配置说明
 
