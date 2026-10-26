@@ -185,6 +185,47 @@ describe('createRouter - 路由器创建', () => {
       expect(afterEach).toHaveBeenCalledTimes(1)
     })
 
+    it.each([
+      ['q=hello+world', 'q', 'hello world'],
+      ['token=a=b', 'token', 'a=b'],
+      ['tag=a&tag=b', 'tag', 'a,b'],
+      ['q=hello%2Bworld', 'q', 'hello+world'],
+      ['q=%2520', 'q', ' '],
+    ])('参数 %s 在 H5 onShow 和返回页面后应该保留 onLoad 的解析结果', (search, key, value) => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      // 与 uni-app H5 的 decodedQuery(route.query) 传给 onLoad 的结果一致。
+      const query = { [key]: value }
+      pages.push({ route: 'pages/detail', $page: { fullPath: `/pages/detail?${search}` } })
+      load(query)
+      const fullPath = router.currentRoute.value.fullPath
+      show()
+      show()
+      expect(router.currentRoute.value.query).toEqual(query)
+      expect(router.currentRoute.value.fullPath).toBe(fullPath)
+      expect(afterEach).toHaveBeenCalledTimes(1)
+
+      pages.push({ route: 'pages/detail', $page: { fullPath: '/pages/detail?id=2' } })
+      load({ id: '2' })
+      show()
+      pages.pop()
+      show()
+      expect(router.currentRoute.value.query).toEqual(query)
+      expect(router.currentRoute.value.fullPath).toBe(fullPath)
+      expect(afterEach).toHaveBeenCalledTimes(3)
+    })
+
+    it('fullPath 未变化时，新的 onLoad 参数仍应该覆盖之前的解析结果', () => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      pages.push({ route: 'pages/detail', $page: { fullPath: '/pages/detail' } })
+      load({ id: '1' })
+      show()
+      load({})
+      show()
+      expect(router.currentRoute.value.query).toEqual({})
+      expect(router.currentRoute.value.fullPath).toBe('/pages/detail')
+      expect(afterEach).toHaveBeenCalledTimes(2)
+    })
+
     it('缺少 fullPath 时，返回同路径的上一页面应该恢复该页面的参数', () => {
       const { router, afterEach, pages, load, show } = setupLifecycle()
       pages.push({ route: 'pages/detail' })
