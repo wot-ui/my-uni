@@ -63,6 +63,25 @@ function setGuardMode(mode: GuardMode) {
   }
 }
 
+async function navigateToDemo() {
+  try {
+    await router.push('/subPages/router/essentials-navigation')
+  }
+  catch (error) {
+    // 返回 false 是示例中的预期结果，守卫已经展示了取消提示。
+    if (error instanceof Error && error.message === 'NavigationCancelled') {
+      return
+    }
+
+    console.error('导航失败:', error)
+    showAlert({
+      title: '导航失败',
+      msg: '页面跳转失败，请重试。详细原因请查看控制台。',
+      confirmButtonText: '确定',
+    })
+  }
+}
+
 function testNavigation() {
   if (currentGuardMode.value === 'false') {
     showConfirm({
@@ -72,7 +91,7 @@ function testNavigation() {
       cancelButtonText: '取消',
       success: (res) => {
         if (res.action === 'confirm') {
-          router.push('/subPages/router/essentials-navigation')
+          navigateToDemo()
         }
       },
     })
@@ -85,13 +104,13 @@ function testNavigation() {
       cancelButtonText: '取消',
       success: (res) => {
         if (res.action === 'confirm') {
-          router.push('/subPages/router/essentials-navigation')
+          navigateToDemo()
         }
       },
     })
   }
   else {
-    router.push('/subPages/router/essentials-navigation')
+    navigateToDemo()
   }
 }
 
