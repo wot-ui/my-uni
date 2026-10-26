@@ -134,6 +134,7 @@ describe('createRouter - 路由器创建', () => {
 
       capturedMixin.onLoad.call({ $mpType: 'page' }, { id: '1' })
       capturedMixin.onLoad.call({ $mpType: 'page' }, { id: '2' })
+      capturedMixin.onShow.call({ $mpType: 'page' })
 
       expect(router.currentRoute.value.query).toEqual({ id: '2' })
       expect(router.currentRoute.value.fullPath).toBe('/pages/detail?id=2')
@@ -147,6 +148,107 @@ describe('createRouter - 路由器创建', () => {
 
       expect(router.currentRoute.value.query).toEqual({ id: '2' })
       expect(router.currentRoute.value.fullPath).toBe('/pages/detail?id=2')
+    })
+  })
+
+  describe('页面生命周期 - 查询参数同步', () => {
+    function setupLifecycle() {
+      const router = createRouter({ routes })
+      let lifecycle: any
+      router.install({
+        provide: vi.fn(),
+        config: { globalProperties: {} },
+        mixin: (mixin: any) => { lifecycle = mixin },
+      } as any)
+      const afterEach = vi.fn()
+      router.afterEach(afterEach)
+      const pages: { route: string, options?: Record<string, string>, $page?: { fullPath: string } }[] = []
+      ;(globalThis as any).getCurrentPages = () => pages
+      return {
+        router,
+        afterEach,
+        pages,
+        load: (query: Record<string, string>) => lifecycle.onLoad.call({ $mpType: 'page' }, query),
+        show: () => lifecycle.onShow.call({ $mpType: 'page' }),
+      }
+    }
+
+    it.each([true, false])('fullPath 存在为 %s 时，onShow 应保留 onLoad 参数且不重复触发 afterEach', (hasFullPath) => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      pages.push({ route: 'pages/detail', ...(hasFullPath ? { $page: { fullPath: '/pages/detail?id=2' } } : {}) })
+      load({ id: '2' })
+      show()
+      show()
+
+      expect(router.currentRoute.value.query).toEqual({ id: '2' })
+      expect(router.currentRoute.value.fullPath).toBe('/pages/detail?id=2')
+      expect(afterEach).toHaveBeenCalledTimes(1)
+    })
+
+    it('缺少 fullPath 时，返回同路径的上一页面应该恢复该页面的参数', () => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      pages.push({ route: 'pages/detail' })
+      load({ id: '1' })
+      show()
+      pages.push({ route: 'pages/detail' })
+      load({ id: '2' })
+      show()
+      expect(router.currentRoute.value.query).toEqual({ id: '2' })
+
+      pages.pop()
+      show()
+      show()
+      expect(router.currentRoute.value.query).toEqual({ id: '1' })
+      expect(router.currentRoute.value.fullPath).toBe('/pages/detail?id=1')
+      expect(afterEach).toHaveBeenCalledTimes(3)
+    })
+
+    it('缺少 fullPath 时，同一页面重新加载空参数应该清除旧参数', () => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      pages.push({ route: 'pages/detail' })
+      load({ id: '1' })
+      show()
+      load({})
+      show()
+      expect(router.currentRoute.value.query).toEqual({})
+      expect(router.currentRoute.value.fullPath).toBe('/pages/detail')
+      expect(afterEach).toHaveBeenCalledTimes(2)
+    })
+
+    it('同路径、同参数的新页面也应该保存参数，即使路由更新被去重', () => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      pages.push({ route: 'pages/detail' })
+      load({ id: '1' })
+      pages.push({ route: 'pages/detail' })
+      load({ id: '1' })
+      show()
+      expect(router.currentRoute.value.query).toEqual({ id: '1' })
+      expect(afterEach).toHaveBeenCalledTimes(1)
+    })
+
+    it('未观察到 onLoad 且缺少 fullPath 时应该使用页面 options，不继承其他页面参数', () => {
+      const { router, pages, show } = setupLifecycle()
+      pages.push({ route: 'pages/detail', options: { id: '1' } })
+      show()
+      expect(router.currentRoute.value.query).toEqual({ id: '1' })
+
+      pages.push({ route: 'pages/detail' })
+      show()
+      expect(router.currentRoute.value.query).toEqual({})
+      expect(router.currentRoute.value.fullPath).toBe('/pages/detail')
+    })
+
+    it('onShow 应该同步 fullPath 的新参数，而不是复用旧参数', () => {
+      const { router, afterEach, pages, load, show } = setupLifecycle()
+      const page = { route: 'pages/detail', $page: { fullPath: '/pages/detail?id=1' } }
+      pages.push(page)
+      load({ id: '1' })
+      show()
+      page.$page.fullPath = '/pages/detail?id=2'
+      show()
+      show()
+      expect(router.currentRoute.value.query).toEqual({ id: '2' })
+      expect(afterEach).toHaveBeenCalledTimes(2)
     })
   })
 

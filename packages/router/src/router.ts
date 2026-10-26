@@ -27,6 +27,8 @@ export function createRouter(options: RouterOptions): Router {
   const routes = options.routes || []
   const beforeGuards: NavigationGuard[] = []
   const afterGuards: NavigationHookAfter[] = []
+  // 页面缺少 fullPath 时，按实例保留参数，支持同路径页面入栈后再返回。
+  const pageQueries = new WeakMap<object, LocationQuery>()
 
   // -------------------------
   // 核心跳转逻辑
@@ -363,8 +365,12 @@ export function createRouter(options: RouterOptions): Router {
     const pages = getCurrentPages()
     const page = pages[pages.length - 1] as any
     if (page && page.route) {
-      const fullPath = page.$page?.fullPath || `/${page.route}`
-      const q = query || getUrlParams(fullPath)
+      const fullPath = page.$page?.fullPath
+      const q = query ?? (fullPath
+        ? getUrlParams(fullPath)
+        : pageQueries.get(page) ?? page.options ?? {})
+      // 即使路由未变化也记录当前页面，避免遗漏同路径、同参数的新实例。
+      pageQueries.set(page, q)
 
       // 避免重复更新
       const newPath = `/${page.route}`
