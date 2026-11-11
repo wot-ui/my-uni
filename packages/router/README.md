@@ -30,6 +30,10 @@ My Uni
 
 详细说明见 [快速开始](https://my-uni.wot-ui.cn/guide/introduction)。
 
+## uni-app x 探索入口
+
+本分支新增实验性 `@wot-ui/router/x`，与默认入口共享导航核心，使用 uni-app x 路由事件同步状态。默认入口继续用于旧 uni-app。接入方式、生命周期差异和验证范围见仓库中的 [Router x 示例](../../examples/router-x/README.md)。当前尚未发布，不能将示例编译或 Web 结果视为原生设备支持承诺。
+
 ## 更新日志
 
 详细日志见 [更新日志](./CHANGELOG.md)。

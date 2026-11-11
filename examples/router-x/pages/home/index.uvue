@@ -1,0 +1,25 @@
+<template>
+  <view class="page">
+    <route-status />
+    <button id="push" @click="push">异步守卫后打开详情</button>
+    <button id="cancel" @click="cancel">取消导航</button>
+    <button id="redirect" @click="redirect">守卫重定向到分包</button>
+    <button id="native" @click="native">直接 uni 导航</button>
+    <button id="tab" @click="tab">切换 Tab</button>
+    <navigator id="navigator" url="/sub/target?from=navigator">navigator 到分包</navigator>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import RouteStatus from '../../components/route-status.vue'
+import { navigate, record, router } from '../../router'
+
+onLoad(() => record('home-load'))
+onShow(() => record('home-show'))
+const push = () => navigate(() => router.push({ name: 'detail', params: { id: '1', text: '中文%&', wait: '1' } }))
+const cancel = () => navigate(() => router.push({ path: '/pages/detail/index', query: { cancel: '1' } }))
+const redirect = () => navigate(() => router.push({ path: '/pages/detail/index', query: { redirect: '1' } }))
+const native = () => uni.navigateTo({ url: '/pages/detail/index?id=native' })
+const tab = () => navigate(() => router.pushTab({ name: 'tab' }))
+</script>

@@ -1,0 +1,11 @@
+<script setup lang="ts">
+import { onLaunch } from '@dcloudio/uni-app'
+import { record } from './router'
+
+onLaunch(() => record('launch'))
+</script>
+
+<style>
+.page { padding: 16px; background-color: #f5f7fa; }
+.status { padding: 12px; background-color: #ffffff; margin-bottom: 12px; }
+</style>
