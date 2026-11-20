@@ -84,7 +84,7 @@ const option = ref({
 })
 
 // 模拟数据变化
-let timer: NodeJS.Timeout | null = null
+let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   timer = setInterval(() => {
