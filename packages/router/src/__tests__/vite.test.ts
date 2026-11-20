@@ -333,11 +333,12 @@ describe('viteRouterInfo', () => {
     expect(readFileSync(join(root, 'typed-router.d.ts'), 'utf8')).not.toContain('"/pages/detail/index"')
   })
 
-  it.each(['malformed', 'deleted'])('reports %s pages.json in dev and recovers after it is fixed', (state) => {
+  it.each(['malformed', 'deleted'])('reports %s pages.json in dev and recovers after the original routes are restored', (state) => {
     vi.useFakeTimers()
     const root = createProject()
     const pagesJson = join(root, 'pages.json')
-    writePages(pagesJson, { pages: [{ path: 'pages/home/index' }] })
+    const original = { pages: [{ path: 'pages/home/index' }] }
+    writePages(pagesJson, original)
     const plugin = viteRouterInfo({ failOnError: true })
     const { config, error } = resolvedConfig(root)
     const server = createDevServer()
@@ -362,13 +363,13 @@ describe('viteRouterInfo', () => {
     })
     expect(readFileSync(join(root, 'typed-router.d.ts'), 'utf8')).toContain('"/pages/home/index"')
 
-    writePages(pagesJson, { pages: [{ path: 'pages/detail/index' }] })
+    writePages(pagesJson, original)
     server.watcher.emit(state === 'malformed' ? 'change' : 'add', pagesJson)
     vi.advanceTimersByTime(50)
 
-    expect(server.ws.send).toHaveBeenCalledWith({ type: 'full-reload' })
-    expect(readFileSync(join(root, 'typed-router.d.ts'), 'utf8')).toContain('"/pages/detail/index"')
-    expect(pluginHooks(plugin).load('\0virtual:uni-pages')).toContain('pages/detail/index')
+    expect(server.ws.send).toHaveBeenNthCalledWith(2, { type: 'full-reload' })
+    expect(readFileSync(join(root, 'typed-router.d.ts'), 'utf8')).toContain('"/pages/home/index"')
+    expect(pluginHooks(plugin).load('\0virtual:uni-pages')).toContain('pages/home/index')
     pluginHooks(plugin).closeBundle()
   })
 

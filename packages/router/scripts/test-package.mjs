@@ -90,7 +90,7 @@ fs.watch = (...args) => {
 }
 syncBuiltinESMExports()
 `)
-const watcher = spawn(process.execPath, ['--import', watcherPreload, cliEntry, '--cwd', cliProject, '--watch'], { stdio: ['ignore', 'pipe', 'pipe'] })
+const watcher = spawn(process.execPath, ['--import', pathToFileURL(watcherPreload).href, cliEntry, '--cwd', cliProject, '--watch'], { stdio: ['ignore', 'pipe', 'pipe'] })
 const watcherExit = new Promise(resolveExit => watcher.once('exit', resolveExit))
 let watcherOutput = ''
 watcher.stdout.on('data', chunk => watcherOutput += chunk)

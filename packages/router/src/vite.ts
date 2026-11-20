@@ -70,6 +70,7 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
   let dts = ''
   let moduleSource = EMPTY_MODULE
   let timer: ReturnType<typeof setTimeout> | undefined
+  let hasWatchError = false
   let cleanupServer: (() => void) | undefined
 
   const fail = (message: string, error?: unknown): void => {
@@ -131,10 +132,13 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
     timer = setTimeout(() => {
       timer = undefined
       try {
-        if (read())
+        if (read() || hasWatchError) {
+          hasWatchError = false
           reload()
+        }
       }
       catch (error) {
+        hasWatchError = true
         const cause = error instanceof Error ? error : new Error(String(error))
         const message = `[@wot-ui/router] 读取路由信息失败（${pagesJson}）：${cause.message}`
         config?.logger.error(message)
@@ -195,6 +199,7 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
         server.watcher.off('add', onChange)
         server.watcher.off('change', onChange)
         server.watcher.off('unlink', onChange)
+        hasWatchError = false
         devServer = undefined
         cleanupServer = undefined
       }
