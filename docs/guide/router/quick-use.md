@@ -1,10 +1,12 @@
 # 快速上手
 :::tip
-推荐使用[wot-starter](https://starter.wot-ui.cn)作为参考，已经集成了`@wot-ui/router`和`@uni-helper/vite-plugin-uni-pages`，可以直接使用，无需关心本章节配置。
+推荐使用[wot-starter](https://starter.wot-ui.cn)作为参考，已经集成了`@wot-ui/router`和路由信息插件，可以直接使用，无需关心本章节配置。
 :::
 ## 配置路由
 
-### 使用 @uni-helper/vite-plugin-uni-pages 生成路由表
+### 使用 viteRouterInfo 读取路由表
+
+`viteRouterInfo()` 会读取现有的 `pages.json`，提供 `virtual:uni-pages`。页面注册仍由 uni-app / HBuilderX 管理。Vite 配置见[安装](./installation.md#配置路由信息插件)。
 
 ```ts
 import { createRouter } from '@wot-ui/router'
@@ -49,11 +51,13 @@ export function createApp() {
 }
 ```
 
-## 配置pages.json
-在pages.json中为页面路由指定`name`字段后，即可以使用`name`跳转
+## 配置页面名称
+
+在 `pages.json` 的页面项中指定 `name` 后，即可以使用 `name` 跳转：
+
 >注意：此处定义的`name`字段必须全局唯一。
 ```json
-//  pages.json
+// pages.json
 {
   "pages": [{
       "path": "pages/home/Home",
@@ -114,7 +118,7 @@ export function createApp() {
 
 完成上面的路由配置后，可以为 `router.push({ path: … })`、`router.push({ name: … })` 等调用开启可选值提示，调用方式不变。
 
-使用 uni-pages 的项目只需在现有插件配置中增加一个生成声明的钩子，再启动一次开发服务。完整步骤见[路径与名称补全](./typed-routes.md#auto-setup)，包括页面名称配置、可复制的 Vite 配置和生效检查。
+使用 `viteRouterInfo()` 时，`typed-router.d.ts` 会自动生成，无需额外配置。也可以运行 `wot-router-types` CLI 单独生成。完整步骤见[路径与名称补全](./typed-routes.md)，包括页面名称配置、可复制的命令/Vite 配置和生效检查。
 
 默认只提供补全；如果还希望拼错时产生 TypeScript 错误，可以进一步开启[严格模式](./typed-routes.md#strict-mode)。
 
@@ -143,19 +147,14 @@ pnpm add unplugin-auto-import -D
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite'
-import UniHelperPages from '@uni-helper/vite-plugin-uni-pages'
+import { viteRouterInfo } from '@wot-ui/router/vite'
 import uni from '@dcloudio/vite-plugin-uni'
 import AutoImport from 'unplugin-auto-import/vite'
 
 export default defineConfig({
   plugins: [
-    UniHelperPages({
-      dts: 'src/uni-pages.d.ts',
-      subPackages: [
-        'src/subPages',
-        // 可以添加更多子包目录
-      ],
-      exclude: ['**/components/**/*'],
+    viteRouterInfo({
+      dts: 'src/typed-router.d.ts',
     }),
     uni(),
     AutoImport({

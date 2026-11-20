@@ -30,6 +30,55 @@ My Uni
 
 详细说明见 [快速开始](https://my-uni.wot-ui.cn/guide/introduction)。
 
+## uni-app x 探索入口
+
+本分支新增实验性 `@wot-ui/router/x`，与默认入口共享导航核心，使用 uni-app x 路由事件同步状态。默认入口继续用于旧 uni-app。接入方式、生命周期差异和验证范围见仓库中的 [Router x 示例](../../examples/router-x/README.md)。
+
+`@wot-ui/router/vite` 提供只读的 `viteRouterInfo()`。它读取现有的 `pages.json`，提供 `virtual:uni-pages` / `virtual:wot-pages`，并按需生成路由类型；不会扫描页面、改写 `pages.json` 或处理 `pages.config.*`。uni-app 和 uni-app x 共用同一套行为：
+
+```ts
+// vite.config.ts
+import { viteRouterInfo } from '@wot-ui/router/vite'
+import uni from '@dcloudio/vite-plugin-uni'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [
+    viteRouterInfo({
+      dts: 'src/typed-router.d.ts',
+    }),
+    uni(),
+  ],
+})
+```
+
+页面注册、样式和分包直接维护在 `pages.json`。需要按名称跳转时，在页面项中增加 `name`：
+
+```json
+{
+  "pages": [
+    { "path": "pages/home/index", "name": "home", "type": "home" }
+  ]
+}
+```
+
+只生成类型时可以关闭虚拟模块：
+
+```ts
+viteRouterInfo({
+  dts: 'src/typed-router.d.ts',
+  virtual: false,
+})
+```
+
+或用 CLI 在开发或 CI 中显式生成：
+
+```sh
+npx wot-router-types --pages pages.json --dts typed-router.d.ts
+```
+
+完整迁移步骤和选项说明见 [路径与名称补全](../../docs/guide/router/typed-routes.md#vite-plugin)。
+
 ## 更新日志
 
 详细日志见 [更新日志](./CHANGELOG.md)。

@@ -11,13 +11,6 @@ import RadarChart from './components/RadarChart.vue'
 import ScatterChart from './components/ScatterChart.vue'
 import StackedBarChart from './components/StackedBarChart.vue'
 
-definePage({
-  name: 'echarts',
-  style: {
-    navigationBarTitleText: 'Echarts 演示',
-  },
-})
-
 const router = useRouter()
 
 function navigateToAsync() {

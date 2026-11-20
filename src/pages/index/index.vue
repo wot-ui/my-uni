@@ -1,12 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'home',
-  layout: 'tabbar',
-  style: {
-    navigationBarTitleText: '首页',
-  },
-})
-
 const router = useRouter()
 const {
   theme,

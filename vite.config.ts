@@ -7,17 +7,15 @@
  * @FilePath: /my-uni/vite.config.ts
  * 记得注释
  */
-import { resolve } from 'node:path'
 import process from 'node:process'
 import Uni from '@uni-helper/plugin-uni'
 import UniHelperComponents from '@uni-helper/vite-plugin-uni-components'
 import { WotResolver } from '@uni-helper/vite-plugin-uni-components/resolvers'
 import UniHelperLayouts from '@uni-helper/vite-plugin-uni-layouts'
 import UniHelperManifest from '@uni-helper/vite-plugin-uni-manifest'
-import UniHelperPages from '@uni-helper/vite-plugin-uni-pages'
 import Optimization from '@uni-ku/bundle-optimizer'
 import UniKuRoot from '@uni-ku/root'
-import { writeRouteTypes } from '@wot-ui/router/typed-routes'
+import { viteRouterInfo } from '@wot-ui/router/vite'
 import { UniEchartsResolver } from 'uni-echarts/resolver'
 import { UniEcharts } from 'uni-echarts/vite'
 import UnoCSS from 'unocss/vite'
@@ -32,25 +30,9 @@ export default defineConfig({
   plugins: [
     // https://github.com/uni-helper/vite-plugin-uni-manifest
     UniHelperManifest(),
-    // https://github.com/uni-helper/vite-plugin-uni-pages
-    UniHelperPages({
-      dts: 'src/uni-pages.d.ts',
-      onBeforeWriteFile(ctx) {
-        writeRouteTypes({
-          pages: ctx.pageMetaData,
-          subPackages: ctx.subPageMetaData,
-        }, { dts: resolve(ctx.root, 'src/typed-router.d.ts') })
-      },
-      subPackages: [
-        'src/subPages',
-        'src/subEcharts',
-        'src/subAsyncEcharts',
-      ],
-      /**
-       * 排除的页面，相对于 dir 和 subPackages
-       * @default []
-       */
-      exclude: ['**/components/**/*.*'],
+    // 读取 pages.json，提供 virtual:uni-pages 并生成路由类型
+    viteRouterInfo({
+      dts: 'src/typed-router.d.ts',
     }),
     // https://github.com/uni-helper/vite-plugin-uni-layouts
     UniHelperLayouts(),

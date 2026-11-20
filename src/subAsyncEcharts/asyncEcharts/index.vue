@@ -10,13 +10,6 @@ import PieChart from '@/subEcharts/echarts/components/PieChart.vue?async'
 import RadarChart from '@/subEcharts/echarts/components/RadarChart.vue?async'
 import ScatterChart from '@/subEcharts/echarts/components/ScatterChart.vue?async'
 import StackedBarChart from '@/subEcharts/echarts/components/StackedBarChart.vue?async'
-
-definePage({
-  name: 'echartsAsync',
-  style: {
-    navigationBarTitleText: 'echarts 异步跨包示例',
-  },
-})
 </script>
 
 <template>

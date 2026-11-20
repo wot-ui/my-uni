@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'api-reference',
-  style: {
-    navigationBarTitleText: 'API 参考',
-  },
-})
-
 const router = useRouter()
 const route = useRoute()
 

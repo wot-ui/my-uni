@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced-guard-async',
-  style: {
-    navigationBarTitleText: '异步守卫',
-  },
-})
-
 const router = useRouter()
 const { alert: showAlert, confirm: showConfirm } = useGlobalMessage()
 

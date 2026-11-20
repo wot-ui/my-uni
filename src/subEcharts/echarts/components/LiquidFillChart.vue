@@ -122,7 +122,7 @@ const option = computed(() => ({
 }))
 
 // 模拟进度变化
-let timer: NodeJS.Timeout | null = null
+let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   timer = setInterval(() => {

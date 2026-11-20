@@ -1,0 +1,13 @@
+<template>
+  <view class="page">
+    <route-status />
+    <button id="home" @click="home">回首页 Tab</button>
+  </view>
+</template>
+
+<script setup lang="ts">
+import RouteStatus from '../../components/route-status.vue'
+import { navigate, router } from '../../router'
+
+const home = () => navigate(() => router.pushTab('/pages/home/index'))
+</script>

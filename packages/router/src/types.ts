@@ -59,6 +59,12 @@ export interface RouteRecordRaw {
    * 路由别名路径 未实现
    */
   aliasPath?: string
+  /**
+   * 进入该路由前执行的路由级守卫。
+   *
+   * 在全局 beforeEach 之后、全局 beforeResolve 之前执行。
+   */
+  beforeEnter?: NavigationGuard | NavigationGuard[]
   [key: string]: any
 }
 
@@ -1512,6 +1518,7 @@ export interface Router {
   pushTab: (to: RouteLocationRaw) => Promise<any>
   back: (back?: RouteBackRaw) => void
   beforeEach: (guard: NavigationGuard) => () => void
+  beforeResolve: (guard: NavigationGuard) => () => void
   afterEach: (guard: NavigationHookAfter) => () => void
   install: (app: App) => void
 }

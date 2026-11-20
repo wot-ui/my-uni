@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced',
-  style: {
-    navigationBarTitleText: '进阶指南',
-  },
-})
-
 const router = useRouter()
 
 function goBack() {

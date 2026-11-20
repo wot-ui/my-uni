@@ -1,0 +1,14 @@
+{
+  "pages": [
+    { "path": "pages/home/index", "style": { "navigationBarTitleText": "Router x 探索" } },
+    { "path": "pages/tab/index", "style": { "navigationBarTitleText": "Tab" } },
+    { "path": "pages/detail/index", "style": { "navigationBarTitleText": "Detail" } }
+  ],
+  "subPackages": [{ "root": "sub", "pages": [{ "path": "target", "style": { "navigationBarTitleText": "分包页" } }] }],
+  "tabBar": {
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/tab/index", "text": "Tab" }
+    ]
+  }
+}

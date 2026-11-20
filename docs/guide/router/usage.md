@@ -8,17 +8,12 @@
 
 ### 基础用法
 
-```ts
+```vue
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from '@wot-ui/router'
-import { getCurrentInstance } from 'vue'
 
 // 使用hooks（推荐）
-let router = useRouter()
-
-// 或者 使用全局挂载的router
-router = instence?.appContext.config.globalProperties.$Router
+const router = useRouter()
 
 // 字符串路径
 router.push('/user')
@@ -43,6 +38,20 @@ router.push({ path: '/user', hash: '#section' })
 
 </script>
 ```
+
+非 App Vapor 环境也可以单独使用全局挂载方式：
+
+```vue
+<script setup lang="ts">
+import { getCurrentInstance } from 'vue'
+
+const instance = getCurrentInstance()
+const router = instance?.appContext.config.globalProperties.$Router
+router?.push('/user')
+</script>
+```
+
+> App Vapor 不支持通过 `app.config.globalProperties.$Router` / `$Route` 访问路由；uni-app x/Vapor 页面请使用 `useRouter()` / `useRoute()`。
 
 ### RouteLocationRaw 参数说明
 
@@ -98,6 +107,7 @@ router.push({ path: '/user', ...closing })
 | name | `string` | 路由名称（用于命名路由跳转） |
 | meta | `RouteMeta` | 路由元信息（可存储任意自定义数据） |
 | aliasPath | `string` | 路由别名路径（兼容旧版） |
+| beforeEnter | `NavigationGuard \| NavigationGuard[]` | 仅进入该路由时执行的路由级守卫 |
 
 ```ts
 // 示例：在 pages.json 中配置路由
@@ -172,7 +182,7 @@ function back() {
 
 ## 导航守卫
 
-`@wot-ui/router`支持`全局前置导航守卫 beforeEach`和`全局后置导航守卫 afterEach`，主要用来通过跳转或取消的方式守卫导航。
+`@wot-ui/router`支持全局 `beforeEach`、`beforeResolve`、`afterEach` 和路由级 `beforeEnter`，主要用来通过跳转或取消的方式守卫导航。执行顺序与 Vue Router 的全局守卫顺序一致：`beforeEach` → `beforeEnter` → `beforeResolve` → 导航 → `afterEach`。
 
 #### 全局前置守卫 beforeEach
 你可以使用 `router.beforeEach` 注册一个全局前置守卫：
@@ -243,6 +253,47 @@ const removeGuard = router.beforeEach((to, from, next) => {
 // 移除守卫
 removeGuard()
 ```
+
+### 路由级 beforeEnter
+
+`beforeEnter` 只在进入对应路由记录时执行，适合放置单个页面的访问校验。同一记录只更新 `query`、`params` 或在原路径与别名之间切换时，不会重复执行；需要检查这些变化时使用 `beforeEach` 或 `beforeResolve`。路由表中可以直接传函数或函数数组：
+
+```ts
+const router = createRouter({
+  routes: [
+    { path: '/pages/home', name: 'home' },
+    {
+      path: '/pages/detail',
+      name: 'detail',
+      beforeEnter: (to, from, next) => {
+        if (to.query.preview === '1') {
+          next(false)
+          return
+        }
+        next()
+      },
+    },
+  ],
+})
+```
+
+### 全局解析前守卫 beforeResolve
+
+`beforeResolve` 在全局 `beforeEach` 和路由级 `beforeEnter` 之后执行，适合需要等待异步数据或权限结果、但仍希望取消导航的场景：
+
+```ts
+const removeResolveGuard = router.beforeResolve(async (to) => {
+  if (to.meta.requiresAuth && !(await checkAuth())) {
+    return { name: 'login' }
+  }
+})
+```
+
+`beforeResolve` 同样支持返回值、Promise、`next` 和移除函数。
+
+在 uni-app x 的 H5 目标中，`/x` 会自动把上述守卫桥接到内部 vue-router，因此直接 `uni.navigateTo`、tabBar 切换和浏览器后退也会经过异步守卫。通过 `router.push`、`replace`、`replaceAll` 或 `pushTab` 发起的导航会记录业务 query，用于还原 uni H5 内部再次编码的参数；后续离开或 History 返回时，守卫和 `afterEach` 仍可读取这些业务值，并保留字面量百分号序列。直接 `uni` 调用等没有该记录的导航保留原生 query，不做推测性解码。
+
+非 H5 目标中的 `router.push`、`replace`、`replaceAll` 和 `pushTab` 执行完整前置队列，但 `navType: 'back'` 除外。`router.back()` 与 `navType: 'back'` 都直接执行原生返回，不执行前置守卫；直接 uni 调用、navigator、原生 tabBar 和系统返回也只做事后状态同步。
 
 ### 全局后置钩子 afterEach
 你也可以注册全局后置钩子，然而和守卫不同的是，这些钩子不会接受 next 函数也不会改变导航本身

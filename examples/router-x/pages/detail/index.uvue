@@ -1,0 +1,29 @@
+<template>
+  <view class="page">
+    <route-status />
+    <button id="repeat" @click="repeat">同路径新参数</button>
+    <button id="replace" @click="replace">replace 到分包</button>
+    <button id="back" @click="back">返回</button>
+    <button id="relaunch" @click="relaunch">reLaunch 首页</button>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { onLoad, onShow, onUnload } from '@dcloudio/uni-app'
+import RouteStatus from '../../components/route-status.vue'
+import { navigate, record, router, state } from '../../router'
+
+onLoad((query) => {
+  state.onLoadRoute = router.currentRoute.value.fullPath
+  record('detail-load-before-sync')
+  router.syncRoute(query)
+  state.afterSyncRoute = router.currentRoute.value.fullPath
+  record('detail-load-after-sync')
+})
+onShow(() => record('detail-show'))
+onUnload(() => record('detail-unload'))
+const repeat = () => navigate(() => router.push('/pages/detail/index?id=2'))
+const replace = () => navigate(() => router.replace('/sub/target?from=replace'))
+const back = () => router.back()
+const relaunch = () => navigate(() => router.replaceAll('/pages/home/index'))
+</script>

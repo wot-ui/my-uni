@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced-beforeeach',
-  style: {
-    navigationBarTitleText: '前置守卫',
-  },
-})
-
 const router = useRouter()
 
 function goBack() {

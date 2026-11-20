@@ -53,6 +53,9 @@ jobs:
       - name: Build and type-test router package
         run: pnpm -F @wot-ui/router test:types
 
+      - name: Check packed router entries
+        run: pnpm -F @wot-ui/router check:package
+
       # This invokes uni-pages and regenerates src/typed-router.d.ts.
       - name: Build H5
         run: pnpm build:h5

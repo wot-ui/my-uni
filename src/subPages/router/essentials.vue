@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'essentials',
-  style: {
-    navigationBarTitleText: '入门指南',
-  },
-})
-
 const router = useRouter()
 const route = useRoute()
 

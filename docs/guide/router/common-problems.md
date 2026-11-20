@@ -20,7 +20,7 @@
 
 ## path、name 没有可选值提示？
 
-需要先[接入路径与名称补全](./typed-routes.md)。使用 uni-pages 时，增加生成钩子后要重启开发服务，并确认生成的 `src/typed-router.d.ts` 被 TypeScript 包含。已有声明仍没有提示时，见[排查步骤](./typed-routes.md#troubleshooting)。
+需要先[接入路径与名称补全](./typed-routes.md)。使用 `viteRouterInfo()` 时确认插件已配置、`pages.json` 页面项已有 `name`，并重启开发服务；使用 CLI 时确认生成的 `typed-router.d.ts` 或 `src/typed-router.d.ts` 被 TypeScript 包含。已有声明仍没有提示时，见[排查步骤](./typed-routes.md#troubleshooting)。
 
 ## 为什么路由名称拼错了没有类型错误？
 
