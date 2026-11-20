@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'api-reference-back',
-  style: {
-    navigationBarTitleText: 'back 高级用法',
-  },
-})
-
 const router = useRouter()
 
 function goBack() {

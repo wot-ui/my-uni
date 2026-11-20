@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'essentials-params',
-  style: {
-    navigationBarTitleText: '路由参数',
-  },
-})
-
 const router = useRouter()
 const route = useRoute()
 

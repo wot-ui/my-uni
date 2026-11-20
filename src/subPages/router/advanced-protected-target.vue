@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced-protected-target',
-  style: {
-    navigationBarTitleText: '受保护页面',
-  },
-})
-
 const router = useRouter()
 
 function goBack() {

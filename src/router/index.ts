@@ -7,7 +7,7 @@
  * @FilePath: /my-uni/src/router/index.ts
  * 记得注释
  */
-/// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
+/// <reference types="@wot-ui/router/client" />
 import { pages, subPackages } from 'virtual:uni-pages'
 
 function generateRoutes() {

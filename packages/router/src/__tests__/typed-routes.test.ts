@@ -5,7 +5,13 @@ import { platform, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import prettier from 'prettier'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { generateRouteTypes, writeRouteTypes } from '../typed-routes'
+import {
+  generateRouteTypes,
+  pagesJsonToPagesConfig,
+  readPagesJson,
+  writeRouteTypes,
+  writeRouteTypesFromPagesJson,
+} from '../typed-routes'
 
 vi.mock('node:fs', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs')>()
@@ -216,6 +222,86 @@ describe('路由类型生成', () => {
       expect(readFileSync(dts, 'utf8')).toBe(previous)
       if (stage !== 'cleanup')
         expect(readdirSync(directory)).toEqual(['router.d.ts'])
+    }
+    finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('pages.json 读取', () => {
+  it('读取主包、分包、name 与 aliasPath，并兼容 subpackages 写法', () => {
+    const config = pagesJsonToPagesConfig({
+      pages: [{ path: 'pages/home/index', name: 'home', aliasPath: '/home', style: { navigationBarTitleText: '首页' } }],
+      subpackages: [{ root: 'sub', pages: [{ path: 'target', name: 'target' }] }],
+    }, 'pages.json')
+    expect(config.pages).toEqual([{ path: 'pages/home/index', name: 'home', aliasPath: '/home' }])
+    expect(config.subPackages).toEqual([{ root: 'sub', pages: [{ path: 'target', name: 'target' }] }])
+    expect(generateRouteTypes(config)).toContain('path:\n      | "/home"\n      | "/pages/home/index"\n      | "/sub/target"')
+  })
+
+  it('支持 BOM、注释和尾随逗号，且不改动字符串内的斜杠与逗号', async () => {
+    const fs = await vi.importActual<typeof import('node:fs')>('node:fs')
+    const directory = mkdtempSync(join(tmpdir(), 'router-types-'))
+    const file = join(directory, 'pages.json')
+    try {
+      fs.writeFileSync(file, `\uFEFF{
+  // 主包
+  "pages": [
+    { "path": "pages/home/index", "name": "a//b,/*c*/" }, // 逗号后仍有注释
+  ],
+  /* 分包 */
+  "subPackages": [
+    { "root": "sub", "pages": [{ "path": "target", "name": "target" },], },
+  ],
+}`)
+      const config = readPagesJson(file)
+      expect(config.pages?.[0].name).toBe('a//b,/*c*/')
+      expect(config.subPackages?.[0].pages[0].path).toBe('target')
+    }
+    finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('缺少 path 或顶层不是对象时给出文件与下标', () => {
+    expect(() => pagesJsonToPagesConfig({ pages: [{ name: 'home' }] }, '/tmp/pages.json'))
+      .toThrow('/tmp/pages.json.pages[0] 缺少字符串 path')
+    expect(() => pagesJsonToPagesConfig({ pages: 'pages/home' }, '/tmp/pages.json'))
+      .toThrow('/tmp/pages.json.pages 必须是数组')
+    expect(() => pagesJsonToPagesConfig([], '/tmp/pages.json'))
+      .toThrow('/tmp/pages.json 顶层必须是对象')
+  })
+
+  it('无法解析时保留原始解析错误和文件路径', async () => {
+    const fs = await vi.importActual<typeof import('node:fs')>('node:fs')
+    const directory = mkdtempSync(join(tmpdir(), 'router-types-'))
+    const file = join(directory, 'pages.json')
+    try {
+      fs.writeFileSync(file, '{ "pages": [ }')
+      expect(() => readPagesJson(file)).toThrow(`无法解析 ${file}`)
+    }
+    finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('直接从 pages.json 生成声明', async () => {
+    const fs = await vi.importActual<typeof import('node:fs')>('node:fs')
+    const directory = mkdtempSync(join(tmpdir(), 'router-types-'))
+    const pagesJson = join(directory, 'pages.json')
+    const dts = join(directory, 'typed-router.d.ts')
+    try {
+      fs.writeFileSync(pagesJson, JSON.stringify({
+        pages: [{ path: 'pages/home/index', name: 'home' }],
+        subPackages: [{ root: 'sub', pages: [{ path: 'target', name: 'target' }] }],
+      }))
+      writeRouteTypesFromPagesJson({ pagesJson, dts, strict: true })
+      const result = readFileSync(dts, 'utf8')
+      expect(result).toContain('| "/pages/home/index"')
+      expect(result).toContain('| "/sub/target"')
+      expect(result).toContain('| "home"')
+      expect(result).toContain('strict: true')
     }
     finally {
       fs.rmSync(directory, { recursive: true, force: true })

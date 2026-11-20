@@ -6,7 +6,11 @@ export const router = createRouter({
   routes: [
     { path: '/pages/home/index', name: 'home' },
     { path: '/pages/tab/index', name: 'tab' },
-    { path: '/pages/detail/index', name: 'detail' },
+    {
+      path: '/pages/detail/index',
+      name: 'detail',
+      beforeEnter: to => record(`before-enter:${to.fullPath}`),
+    },
     { path: '/sub/target', name: 'target' },
   ],
 })
@@ -26,6 +30,7 @@ router.beforeEach(async (to) => {
   if (to.query.wait === '1')
     await new Promise(resolve => setTimeout(resolve, 30))
 })
+router.beforeResolve(to => record(`before-resolve:${to.fullPath}`))
 router.afterEach(() => record('after'))
 
 export async function navigate(action: () => Promise<unknown>) {

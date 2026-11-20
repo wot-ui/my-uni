@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'create-uni',
-  style: {
-    navigationBarTitleText: 'CreateUni 脚手架',
-  },
-})
-
 const { success: showSuccess } = useGlobalToast()
 // 核心优势
 const advantages = ref([

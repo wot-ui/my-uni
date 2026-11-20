@@ -46,6 +46,19 @@
         "types": "./dist/typed-routes.d.cts",
         "default": "./dist/typed-routes.cjs"
       }
+    },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite.d.mts",
+        "default": "./dist/vite.mjs"
+      },
+      "require": {
+        "types": "./dist/vite.d.cts",
+        "default": "./dist/vite.cjs"
+      }
+    },
+    "./client": {
+      "types": "./client.d.ts"
     }
   },
   "main": "dist/index.js",
@@ -53,8 +66,13 @@
   "unpkg": "dist/index.global.js",
   "jsdelivr": "dist/index.global.js",
   "types": "dist/index.d.mts",
+  "bin": {
+    "wot-router-types": "./bin/wot-router-types.mjs"
+  },
   "files": [
-    "dist"
+    "dist",
+    "bin",
+    "client.d.ts"
   ],
   "scripts": {
     "clean": "rimraf dist",

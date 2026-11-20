@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced-guard-remove',
-  style: {
-    navigationBarTitleText: '守卫管理',
-  },
-})
-
 const router = useRouter()
 const { alert: showAlert, confirm: showConfirm } = useGlobalMessage()
 

@@ -24,14 +24,41 @@ writeFileSync(esmConsumer, `
 import assert from 'node:assert/strict'
 import { createRouter } from '@wot-ui/router'
 import { createRouter as createRouterX } from '@wot-ui/router/x'
-import { generateRouteTypes } from '@wot-ui/router/typed-routes'
+import { viteRouterInfo } from '@wot-ui/router/vite'
+import { generateRouteTypes, readPagesJson } from '@wot-ui/router/typed-routes'
 assert.equal(createRouter({ routes: [] }).currentRoute.value.path, '/')
 assert.equal(typeof createRouterX({ routes: [] }).dispose, 'function')
+assert.equal(typeof viteRouterInfo, 'function')
 assert.equal(typeof generateRouteTypes({}), 'string')
+assert.equal(typeof readPagesJson, 'function')
 `)
 execFileSync(process.execPath, [esmConsumer], { cwd: staging, stdio: 'pipe' })
 
-for (const subpath of ['', '/x', '/typed-routes']) {
+assert.equal(manifest.bin?.['wot-router-types'], './bin/wot-router-types.mjs')
+const cliProject = resolve(staging, 'typed-routes-cli')
+mkdirSync(cliProject, { recursive: true })
+writeFileSync(resolve(cliProject, 'pages.json'), JSON.stringify({
+  pages: [{ path: 'pages/home/index', name: 'home' }],
+  subPackages: [{ root: 'sub', pages: [{ path: 'target', name: 'target' }] }],
+}))
+execFileSync(process.execPath, [
+  resolve(destination, 'bin/wot-router-types.mjs'),
+  '--cwd',
+  cliProject,
+  '--pages',
+  'pages.json',
+  '--dts',
+  'typed-router.d.ts',
+  '--strict',
+], { cwd: staging, stdio: 'pipe' })
+const cliDts = readFileSync(resolve(cliProject, 'typed-router.d.ts'), 'utf8')
+assert.match(cliDts, /"\/pages\/home\/index"/)
+assert.match(cliDts, /"\/sub\/target"/)
+assert.match(cliDts, /"home"/)
+assert.match(cliDts, /"target"/)
+assert.match(cliDts, /strict: true/)
+
+for (const subpath of ['', '/x', '/typed-routes', '/vite']) {
   const key = subpath ? `.${subpath}` : '.'
   const exports = manifest.exports[key]
   const esmFile = resolve(destination, exports.import.default)
@@ -39,9 +66,17 @@ for (const subpath of ['', '/x', '/typed-routes']) {
   assert.equal(realpathSync(require.resolve(`@wot-ui/router${subpath}`)), realpathSync(cjsFile))
   const esm = await import(pathToFileURL(esmFile).href)
   const cjs = require(`@wot-ui/router${subpath}`)
-  assert.deepEqual(Object.keys(esm).sort(), Object.keys(cjs).sort())
+  assert.deepEqual(
+    Object.keys(esm).sort(),
+    Object.keys(cjs).filter(key => key !== '__toESM').sort(),
+  )
   if (subpath === '/typed-routes') {
     assert.match(esm.generateRouteTypes({ pages: [{ path: 'pages/home' }] }), /pages\/home/)
+  }
+  else if (subpath === '/vite') {
+    assert.equal(typeof esm.viteRouterInfo, 'function')
+    assert.equal(typeof cjs.viteRouterInfo, 'function')
+    assert.equal(esm.viteRouterInfo({ pages: 'pages.json', dts: 'typed-router.d.ts', cwd: cliProject }).name, 'vite-plugin-uni-router-info')
   }
   else {
     for (const entry of [esm, cjs]) {
@@ -56,6 +91,15 @@ for (const subpath of ['', '/x', '/typed-routes']) {
   }
 }
 
+const clientEntry = resolve(destination, manifest.exports['./client'].types)
+const clientTypes = readFileSync(clientEntry, 'utf8')
+assert.match(clientTypes, /declare module 'virtual:uni-pages'/)
+assert.match(clientTypes, /declare module 'virtual:wot-pages'/)
+assert.doesNotMatch(clientTypes, /definePage/)
+assert.throws(() => require.resolve('@wot-ui/router/pages'))
+for (const file of ['client.d.ts', 'dist/vite.mjs', 'dist/vite.cjs', 'dist/vite.d.mts', 'dist/vite.d.cts'])
+  assert.ok(readFileSync(resolve(destination, file), 'utf8').length > 0, `${file} missing from tarball`)
+
 const checked = new Set()
 function checkRuntime(file, isX) {
   const identity = `${file}:${isX}`
@@ -63,7 +107,7 @@ function checkRuntime(file, isX) {
     return
   checked.add(identity)
   const text = readFileSync(file, 'utf8')
-  assert.doesNotMatch(text, /node:|typed-routes/)
+  assert.doesNotMatch(text, /node:|typed-routes/, `${file} must stay runtime-safe`)
   if (isX)
     assert.doesNotMatch(text, /\.mixin\(|\$mpType|\$page/)
   for (const match of text.matchAll(/(?:from|require\()\s*["'](\.[^"']+)["']/g))

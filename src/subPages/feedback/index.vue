@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'feedback',
-  style: {
-    navigationBarTitleText: '全局反馈',
-  },
-})
-
 const { success: showSuccess } = useGlobalToast()
 const { show: showToast, success, error, warning, info } = useGlobalToast()
 const { loading, close: closeLoading } = useGlobalLoading()

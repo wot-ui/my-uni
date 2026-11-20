@@ -12,12 +12,23 @@ import { defineConfig } from 'tsdown'
 
 const isProduction = process.env.NODE_ENV === 'production'
 
-export default defineConfig({
-  entry: ['src/index.ts', 'src/x.ts', 'src/typed-routes.ts'],
+const shared = {
   format: ['esm', 'cjs'],
   target: 'node16.14',
   outDir: 'dist',
-  clean: true,
   dts: true,
   minify: isProduction,
-})
+} as const
+
+export default defineConfig([
+  {
+    ...shared,
+    entry: ['src/index.ts', 'src/x.ts'],
+    clean: true,
+  },
+  {
+    ...shared,
+    entry: ['src/typed-routes.ts', 'src/vite.ts'],
+    clean: false,
+  },
+])

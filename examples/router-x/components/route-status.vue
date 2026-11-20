@@ -1,7 +1,6 @@
 <template>
   <view class="status">
     <text id="current">{{ route.fullPath }}</text>
-    <text id="global-route">{{ $Route.fullPath }}</text>
     <text id="result">{{ state.result }}</text>
     <text id="load-route">{{ state.onLoadRoute }}</text>
     <text id="sync-route">{{ state.afterSyncRoute }}</text>

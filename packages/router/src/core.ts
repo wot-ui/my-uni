@@ -19,12 +19,39 @@ import { getUrlParams, normalizeUrl, stringifyQuery } from './utils'
 /** 内部平台边界，不从包入口导出。 */
 export type SyncRoute = (path: string, query: LocationQuery) => void
 export type InstallRouter = (app: App, router: Router, syncRoute: SyncRoute) => void
+export type GuardHost = 'core' | 'external'
+
+export interface RouterInternals {
+  resolve: (to: RouteLocationRaw) => RouteLocationNormalized
+  runBeforeGuards: (to: RouteLocationNormalized, from: RouteLocationNormalized) => Promise<void>
+  runAfterGuards: (to: RouteLocationNormalized, from: RouteLocationNormalized) => void
+  syncRoute: (path: string, query: LocationQuery) => void
+  setGuardHost: (host: GuardHost) => void
+}
+
+const routerInternals = new WeakMap<Router, RouterInternals>()
+
+/** 仅供平台适配器使用的内部能力，不进入公共类型声明。 */
+export function getRouterInternals(router: Router): RouterInternals {
+  const internals = routerInternals.get(router)
+  if (!internals)
+    throw new Error('[@wot-ui/router] 缺少内部路由能力，请勿手动构造 Router 对象。')
+  return internals
+}
 
 export function createRouterCore(options: RouterOptions, install: InstallRouter): Router {
-  const currentRoute = shallowRef<RouteLocationNormalized>(START_LOCATION_NORMALIZED)
+  const currentRoute = shallowRef<RouteLocationNormalized>({
+    ...START_LOCATION_NORMALIZED,
+    params: {},
+    query: {},
+    meta: {},
+    style: {},
+  })
   const routes = options.routes || []
   const beforeGuards: NavigationGuard[] = []
+  const beforeResolveGuards: NavigationGuard[] = []
   const afterGuards: NavigationHookAfter[] = []
+  let guardHost: GuardHost = 'core'
 
   // -------------------------
   // 核心跳转逻辑
@@ -137,9 +164,9 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     const fromLocation = unref(currentRoute)
 
     // 1. 执行前置守卫
-    if (!skipGuards) {
+    if (!skipGuards && guardHost === 'core') {
       try {
-        await runGuardQueue(beforeGuards, targetLocation, fromLocation)
+        await runBeforeNavigation(targetLocation, fromLocation)
       }
       catch (error: any) {
         if (error && (error.message === 'NavigationCancelled' || error.message === 'NavigationRedirect')) {
@@ -173,6 +200,22 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     catch (error: any) {
       return Promise.reject(error)
     }
+  }
+
+  function getBeforeEnterGuards(path: string): NavigationGuard[] {
+    const route = routes.find(r => r.path === path || r.aliasPath === path)
+    if (!route?.beforeEnter)
+      return []
+    return Array.isArray(route.beforeEnter) ? route.beforeEnter : [route.beforeEnter]
+  }
+
+  async function runBeforeNavigation(
+    to: RouteLocationNormalized,
+    from: RouteLocationNormalized,
+  ) {
+    await runGuardQueue(beforeGuards, to, from)
+    await runGuardQueue(getBeforeEnterGuards(to.path), to, from)
+    await runGuardQueue(beforeResolveGuards, to, from)
   }
 
   function performUniNavigate(
@@ -303,6 +346,15 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     }
   }
 
+  function beforeResolve(guard: NavigationGuard) {
+    beforeResolveGuards.push(guard)
+    return () => {
+      const i = beforeResolveGuards.indexOf(guard)
+      if (i > -1)
+        beforeResolveGuards.splice(i, 1)
+    }
+  }
+
   function afterEach(guard: NavigationHookAfter) {
     afterGuards.push(guard)
     return () => {
@@ -321,9 +373,22 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     pushTab,
     back,
     beforeEach,
+    beforeResolve,
     afterEach,
     install: app => install(app, router, syncRoute),
   }
+
+  routerInternals.set(router, {
+    resolve,
+    runBeforeGuards: runBeforeNavigation,
+    runAfterGuards: (to, from) => {
+      afterGuards.forEach(guard => guard(to, from))
+    },
+    syncRoute,
+    setGuardHost: (host) => {
+      guardHost = host
+    },
+  })
 
   function syncRoute(newPath: string, q: LocationQuery) {
   // 避免重复更新
@@ -359,8 +424,9 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
 
     router.currentRoute.value = to
 
-    // 触发后置守卫（针对原生跳转/返回）
-    afterGuards.forEach(guard => guard(to, from))
+    // H5 由 vue-router 托管前置/后置守卫时，避免同一轮导航重复触发 afterEach。
+    if (guardHost === 'core')
+      afterGuards.forEach(guard => guard(to, from))
   }
 
   return router

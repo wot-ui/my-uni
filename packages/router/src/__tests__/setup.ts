@@ -7,6 +7,7 @@ declare global {
     switchTab: ReturnType<typeof vi.fn>
     reLaunch: ReturnType<typeof vi.fn>
     navigateBack: ReturnType<typeof vi.fn>
+    getSystemInfoSync: ReturnType<typeof vi.fn>
   }
   const getCurrentPages: ReturnType<typeof vi.fn>
   const resetMocks: () => void
@@ -56,6 +57,7 @@ const uniMock = {
   switchTab: switchTabMock,
   reLaunch: reLaunchMock,
   navigateBack: navigateBackMock,
+  getSystemInfoSync: vi.fn(() => ({ uniPlatform: 'web' })),
 }
 
 Object.defineProperty(globalThis, 'uni', {

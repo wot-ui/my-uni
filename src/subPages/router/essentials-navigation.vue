@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'essentials-navigation',
-  style: {
-    navigationBarTitleText: '编程式导航',
-  },
-})
-
 const router = useRouter()
 const route = useRoute()
 const { error: showError } = useGlobalToast()

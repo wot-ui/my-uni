@@ -1,12 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'about',
-  layout: 'tabbar',
-  style: {
-    navigationBarTitleText: '关于',
-  },
-})
-
 // 核心团队成员
 const coreTeam = [
   {

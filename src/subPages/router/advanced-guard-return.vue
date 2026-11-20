@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced-guard-return',
-  style: {
-    navigationBarTitleText: '守卫返回值',
-  },
-})
-
 const router = useRouter()
 const { confirm: showConfirm, alert: showAlert } = useGlobalMessage()
 

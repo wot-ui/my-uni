@@ -300,6 +300,76 @@ describe('router guards - 路由守卫', () => {
     })
   })
 
+  describe('beforeResolve and beforeEnter - Vue Router 对齐能力', () => {
+    it('应该按 beforeEach -> beforeEnter -> beforeResolve 顺序执行', async () => {
+      const order: string[] = []
+      const router = createRouter({
+        routes: [
+          { path: '/pages/index', name: 'index' },
+          {
+            path: '/pages/detail',
+            name: 'detail',
+            beforeEnter: (_to, _from, next) => {
+              order.push('beforeEnter')
+              next()
+            },
+          },
+        ],
+      })
+      router.beforeEach((_to, _from, next) => {
+        order.push('beforeEach')
+        next()
+      })
+      router.beforeResolve((_to, _from, next) => {
+        order.push('beforeResolve')
+        next()
+      })
+
+      await router.push('/pages/detail')
+
+      expect(order).toEqual(['beforeEach', 'beforeEnter', 'beforeResolve'])
+    })
+
+    it('应该只在进入匹配路由时执行对应 beforeEnter', async () => {
+      const detailGuard = vi.fn()
+      const userGuard = vi.fn()
+      const router = createRouter({
+        routes: [
+          { path: '/pages/index', name: 'index' },
+          { path: '/pages/detail', name: 'detail', beforeEnter: detailGuard },
+          { path: '/pages/user', name: 'user', beforeEnter: [userGuard] },
+        ],
+      })
+
+      await router.push('/pages/detail')
+      await router.push('/pages/index')
+
+      expect(detailGuard).toHaveBeenCalledOnce()
+      expect(userGuard).not.toHaveBeenCalled()
+    })
+
+    it('应该允许 beforeResolve 取消导航', async () => {
+      const router = createRouter({ routes })
+      router.beforeResolve(() => false)
+
+      await expect(router.push('/pages/index')).rejects.toThrow('NavigationCancelled')
+      expect(uni.navigateTo).not.toHaveBeenCalled()
+    })
+
+    it('应该允许 beforeResolve 重定向并移除守卫', async () => {
+      const router = createRouter({ routes })
+      const removeGuard = router.beforeResolve(() => '/pages/user')
+
+      await router.push('/pages/index')
+      expect(uni.navigateTo).toHaveBeenCalledWith(expect.objectContaining({ url: '/pages/user' }))
+
+      removeGuard()
+      vi.mocked(uni.navigateTo).mockClear()
+      await router.push('/pages/index')
+      expect(uni.navigateTo).toHaveBeenCalledWith(expect.objectContaining({ url: '/pages/index' }))
+    })
+  })
+
   describe('bug fixes - 问题修复', () => {
     it('router.push 触发时，onLoad 不应重复触发 afterEach', async () => {
       const router = createRouter({ routes })

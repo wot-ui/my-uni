@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'advanced-aftereach',
-  style: {
-    navigationBarTitleText: 'afterEach 钩子演示',
-  },
-})
-
 const router = useRouter()
 
 function goBack() {

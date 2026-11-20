@@ -24,6 +24,7 @@
 | `pushTab` | `(to: RouteLocationRaw) => Promise<any>` | 跳转到 tabBar 页面 |
 | `back` | `(back?: RouteBackRaw) => void` | 返回上一页面或多级页面 |
 | `beforeEach` | `(guard: NavigationGuard) => () => void` | 注册全局前置导航守卫，返回移除守卫的函数 |
+| `beforeResolve` | `(guard: NavigationGuard) => () => void` | 注册全局解析前守卫，在路由级 `beforeEnter` 之后执行，返回移除守卫的函数 |
 | `afterEach` | `(guard: NavigationHookAfter) => () => void` | 注册全局后置导航守卫，返回移除守卫的函数 |
 | `install` | `(app: App) => void` | Vue 插件安装方法 |
 
@@ -32,9 +33,11 @@
 
 ▸ useRouter(): `Router`
 
-返回路由器实例。相当于在模板中使用 $Router。
+返回路由器实例。在非 App Vapor 目标中，相当于在模板中使用 $Router。
 
 >不可以脱离 Vue 上下文使用
+
+> `@wot-ui/router/x` 的 App Vapor 目标不支持 `$Router`/`$Route`，模板和脚本都应使用 `useRouter()`/`useRoute()`。
 
 ### 返回值
 
@@ -46,7 +49,9 @@
 
 ▸ useRoute(): `Route`
 
-返回当前的路由地址信息。相当于在模板中使用 $Route。
+返回当前的路由地址信息。在非 App Vapor 目标中，相当于在模板中使用 $Route。
+
+> App Vapor 不支持 `$Route`，请使用 `useRoute()`。
 
 >不可以脱离 Vue 上下文使用，且只能在页面`mount`之后才可与使用。当使用场景为外部链接跳转进入或H5页面刷新时，默认从当前链接中取得query参数并放在`Route`的`query`字段中，这种场景建议走`onLoad`声明周期获取参数。
 
@@ -173,5 +178,5 @@ writeRouteTypes({
 
 候选值按字典序排列，每行输出一个字面量，便于审阅页面增删。生成文件为 import 和模块增强声明分别添加 `prettier-ignore`，防止格式化后再次生成导致文件反复变化。
 
-这两个工具不负责扫描页面、解析 `pages.json` 或监听文件变化。使用 uni-pages 时可按[自动生成步骤](./typed-routes.md#auto-setup)接入；其他项目需自行读取配置并在变化后重新调用。带注释或条件编译的页面配置应先由对应工具解析，再传入生成器。
+这两个工具不负责解析 `pages.json` 或监听文件变化。需要自动读取 `pages.json`、提供 `virtual:uni-pages` 时使用 [`viteRouterInfo()`](./typed-routes.md#vite-plugin)；只想生成类型时可用 `virtual: false` 或 [CLI](./typed-routes.md#cli)。其他项目需自行读取配置并在变化后重新调用。
 

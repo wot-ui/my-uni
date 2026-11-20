@@ -1,11 +1,4 @@
 <script setup lang="ts">
-definePage({
-  name: 'router',
-  style: {
-    navigationBarTitleText: '路由管理',
-  },
-})
-
 const { success: showSuccess } = useGlobalToast()
 const router = useRouter()
 const route = useRoute()

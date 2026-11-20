@@ -12,9 +12,16 @@ declare module '@wot-ui/router' {
   }
 }
 
-const router = createRouter({ routes: [{ path: '/pages/home', name: 'home' }] })
+const router = createRouter({
+  routes: [{
+    path: '/pages/home',
+    name: 'home',
+    beforeEnter: (_to, _from, next) => next(),
+  }],
+})
 router.push('/pages/home') // @complete:path
 useRouter().push({ name: 'home' }) // @complete:name
+router.beforeResolve(() => true)
 router.syncRoute({ id: '1' })
 router.dispose()
 useRouter().syncRoute({})

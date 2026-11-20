@@ -1,8 +1,8 @@
 # @wot-ui/router 支持 uni-app x 的可行性研究
 
-后续进展：用户已选择同包 `/x` 入口并授权分支实现，当前代码与验证结果见 [实现记录](./router-uni-app-x-implementation.md)。下文保留探索时的 1.2.0 基线结论，源码行号对应该基线。
+后续进展：用户已选择同包 `/x` 入口并授权分支实现；最终页面接入采用只读的 `viteRouterInfo()`，以 `pages.json` 为唯一来源提供虚拟模块和类型，并在 2026-11-15 完成五端编译与运行验收。当前代码与验证结果见 [实现记录](./router-uni-app-x-implementation.md)。下文保留探索时的 1.2.0 基线结论，源码行号对应该基线；其中“没有 x 编译或运行验收结果”等表述仅代表 2026-11-08 的研究时点。
 
-结论：值得进入隔离 POC。现有路径解析、查询参数、守卫队列和类型生成逻辑具有复用基础；1.2.0 的全局 mixin 状态同步方式不能作为 App Vapor 的兼容实现。建议采用共享核心与运行时适配器，先验证独立 x 入口的消费方式，再决定发行结构。当前没有任何 x 平台的编译或运行验收结果，不能发布支持声明。
+结论（2026-11-08 研究时点）：值得进入隔离 POC。现有路径解析、查询参数、守卫队列和类型生成逻辑具有复用基础；1.2.0 的全局 mixin 状态同步方式不能作为 App Vapor 的兼容实现。建议采用共享核心与运行时适配器，先验证独立 x 入口的消费方式，再决定发行结构。该研究时点没有 x 平台的编译或运行验收结果，不能发布支持声明；后续实现与验收见[实现记录](./router-uni-app-x-implementation.md)。
 
 范围：2026-11-08 的探索记录；不迁移库、不修改公共 API、不升级旧工程依赖、不发布。源码基线为 `5de843537bd5077d3ae27c83aa2bfa7a69ff660b`，包版本 1.2.0。开始时工作区干净，未发现适用的 AGENTS.md 或既有 OpenSpec 迁移提案。本轮仅新增本研究文档；临时探针位于 `/tmp/my-uni-router-x-research/`。
 
@@ -92,7 +92,7 @@ navigateTo/redirectTo 面向非 tabBar 页面，switchTab 面向 tabBar 且 URL 
 1. x 编译器如何解析 npm 包的 `.mjs`、exports、Vue external，是否出现第二份 Vue，现有 peer 是否与消费端 runtime 冲突。不能仅修改 peer 为任意版本来通过安装。
 2. x 页面中 `App` 与框架 VueApp 类型是否可赋值；Symbol InjectionKey、WeakMap、Promise、函数 length 和函数附加属性在 TS bytecode 目标的真实行为。
 3. 生成的 RouterTypeConfig 固定增强 `@wot-ui/router`；如果新增 `/x`，必须从同一类型定义转出，或显式调整生成器设计。避免 IDE 有补全而运行时路由表不一致。
-4. 类型生成应消费平台过滤后的 pages.json/分包配置，与实际路由表一致。现有生成器没有 tabBar 专属类型，也不解析原始 JSONC；不要将旧 uni-pages 插件兼容性当作库本身兼容性。
+4. 类型生成已提供不依赖插件的 `readPagesJson` 与 `wot-router-types` CLI，支持 `pages`/`subPackages`/`subpackages`、`name`/`aliasPath` 以及 JSONC 注释、BOM、尾随逗号。仍未按 `pages.json` 里的 `#ifdef` 做平台过滤，也没有 tabBar 专属类型；严格模式下的候选值是各平台并集，不能替代运行时校验。
 5. exports 主入口 types 统一指向 `.d.mts`；子入口有独立 `.d.mts/.d.cts`。当前 `main=dist/index.js`、unpkg/jsdelivr 指向的 global 文件不在本轮产物中：是已有打包元数据风险，遇到绕过 exports 的消费工具需验证，不能归咎于 x。
 6. 最终以 pack 后实际制品安装进干净 x 工程验证，源码 alias/workspace 链接只可用于诊断。旧库测试和 CI 保持独立，不升级旧 DCloud 编译链来解决 x。
 
