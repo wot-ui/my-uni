@@ -136,12 +136,27 @@ export default createRouter({ routes })
 
 ### 5. 性能与边界
 
-插件在 Vite 启动时只读取一个 `pages.json`，启动成本基本与页面数量无关，也没有运行时开销。`pages.json` 变化后会防抖重新读取；内容变化时使虚拟模块失效，并在 dev 下 full reload。
+插件在 Vite 启动时只读取一个 `pages.json`，解析和类型生成耗时随配置规模增长；无需扫描页面文件，也没有运行时开销。`pages.json` 变化后会防抖重新读取；内容变化时使虚拟模块失效，并在 dev 下 full reload。
 
 - 不写入 `pages.json`，原有注释和 `#ifdef` 会原样保留。
 - 不依赖 `esbuild`、`typescript` 或页面 AST 解析。
 - 新增、删除、改名页面以 `pages.json` 为准，不支持页面文件里的隐式元数据。
 - 读取失败默认只记录错误；需要中断构建时传 `failOnError: true`。
+
+#### pages.json 条件编译 {#pages-json-conditionals}
+
+读取时先按当前目标过滤独立行上的 `#ifdef`、`#ifndef`、`#else` 和 `#endif` 区块，支持 `// #ifdef H5` 与 `/* #ifdef H5 */` 两种注释形式，再解析 JSONC。虚拟模块与类型声明使用同一份过滤结果，避免运行时路由表与严格模式候选值包含不同平台的页面；源文件及其注释保持不变。
+
+默认读取构建环境的 `UNI_PLATFORM`，也可以通过 Vite 插件的 `platform` 选项或 CLI 的 `--platform` 显式指定目标。条件表达式支持平台标识、自定义标识、`||`、`&&`、`!` 和括号，例如 `H5 || (MP_WEIXIN && FEATURE_ROUTER)`；不支持 `#if` 或版本比较表达式。
+
+```ts
+viteRouterInfo({
+  platform: 'mp-weixin',
+  defines: ['FEATURE_ROUTER'],
+})
+```
+
+`defines` 可传入额外启用的自定义标识；构建环境的 `UNI_CUSTOM_CONTEXT` 也会参与计算（JSON 对象中值为真时启用标识，为假时关闭标识；`VUE3` 及当前编译模式的固有标识保持启用）。独立 Node 工具同样可以向 `readPagesJson()` 传入 `platform` 和 `defines`。遇到条件指令却未提供平台或自定义标识时会明确报告错误，不会静默合并各平台的页面。
 
 ### 6. uni-app x 注意事项
 
@@ -160,6 +175,7 @@ npx wot-router-types --pages pages.json --dts typed-router.d.ts
 - 未传 `--pages` 时，依次查找 `src/pages.json`、`pages.json`。
 - 未传 `--dts` 时，`pages.json` 在 `src` 下则输出 `src/typed-router.d.ts`，否则输出根目录 `typed-router.d.ts`。
 - `--strict` 生成严格模式；`--watch` 监听 `pages.json` 变化。
+- `--platform <name>` 指定条件编译目标，例如 `--platform mp-weixin`；省略时读取 `UNI_PLATFORM`，自定义标识可通过 `UNI_CUSTOM_CONTEXT` 提供。
 - 会打印本次生成的路径数与名称数，例如 `pages.json -> typed-router.d.ts（4 个路径，0 个名称）`。
 
 源码仓库中可以直接运行：
@@ -217,7 +233,11 @@ viteRouterInfo({
 })
 ```
 
-使用 CLI 时同样传入 `strict: true`。
+使用 CLI 时传入 `--strict`：
+
+```sh
+npx wot-router-types --pages pages.json --dts typed-router.d.ts --strict
+```
 
 **手工声明方式**：直接在 `RouterTypeConfig` 中增加 `strict: true` 字段：
 

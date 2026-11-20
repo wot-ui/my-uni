@@ -24,7 +24,7 @@
 import { createRouter, useRoute, useRouter } from '@wot-ui/router/x'
 ```
 
-完整用法及示例准备命令见 [示例 README](../../examples/router-x/README.md)。`/x` 的入口选择是应用级选择，不在同一应用同时安装 legacy 和 x router。
+完整用法及示例准备命令见 [示例 README](https://github.com/wot-ui/my-uni/blob/c9258a94434a749dd4ad3d48a6ee3a25125bbf1d/examples/router-x/README.md)。`/x` 的入口选择是应用级选择，不在同一应用同时安装 legacy 和 x router。
 
 ## 实测后确定的行为边界
 

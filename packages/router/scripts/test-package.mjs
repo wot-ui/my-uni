@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -57,6 +57,61 @@ assert.match(cliDts, /"\/sub\/target"/)
 assert.match(cliDts, /"home"/)
 assert.match(cliDts, /"target"/)
 assert.match(cliDts, /strict: true/)
+
+const cliEntry = resolve(destination, 'bin/wot-router-types.mjs')
+const cliPages = resolve(cliProject, 'pages.json')
+const originalPages = readFileSync(cliPages, 'utf8')
+assert.throws(() => execFileSync(process.execPath, [cliEntry, '--cwd', cliProject, '--dts', './pages.json'], { stdio: 'pipe' }))
+assert.equal(readFileSync(cliPages, 'utf8'), originalPages)
+
+writeFileSync(cliPages, `{"pages":[
+  {"path":"common"},
+  // #ifdef MP-WEIXIN
+  {"path":"wechat"},
+  // #endif
+  // #ifdef H5
+  {"path":"web"},
+  // #endif
+]}`)
+execFileSync(process.execPath, [cliEntry, '--cwd', cliProject, '--platform', 'h5'], { stdio: 'pipe' })
+const platformDts = readFileSync(resolve(cliProject, 'typed-router.d.ts'), 'utf8')
+assert.match(platformDts, /"\/web"/)
+assert.doesNotMatch(platformDts, /wechat/)
+
+writeFileSync(cliPages, originalPages)
+const watcher = spawn(process.execPath, [cliEntry, '--cwd', cliProject, '--watch'], { stdio: ['ignore', 'pipe', 'pipe'] })
+const watcherExit = new Promise(resolveExit => watcher.once('exit', resolveExit))
+let watcherOutput = ''
+watcher.stdout.on('data', chunk => watcherOutput += chunk)
+watcher.stderr.on('data', chunk => watcherOutput += chunk)
+async function waitFor(predicate) {
+  const deadline = Date.now() + 10000
+  while (!predicate()) {
+    assert.equal(watcher.exitCode, null, `CLI watcher exited: ${watcherOutput}`)
+    assert.ok(Date.now() < deadline, `CLI watcher timed out: ${watcherOutput}`)
+    await new Promise(resolveWait => setTimeout(resolveWait, 25))
+  }
+}
+try {
+  await waitFor(() => watcherOutput.includes('正在监听'))
+  for (const [index, atomic] of [true, true, false].entries()) {
+    const path = `watch-${index}`
+    const value = JSON.stringify({ pages: [{ path }] })
+    if (atomic) {
+      const temporary = resolve(cliProject, 'pages.tmp')
+      writeFileSync(temporary, value)
+      renameSync(temporary, cliPages)
+    }
+    else {
+      writeFileSync(cliPages, value)
+    }
+    await waitFor(() => readFileSync(resolve(cliProject, 'typed-router.d.ts'), 'utf8').includes(`"/${path}"`))
+  }
+}
+finally {
+  watcher.kill()
+  await watcherExit
+}
 
 for (const subpath of ['', '/x', '/typed-routes', '/vite']) {
   const key = subpath ? `.${subpath}` : '.'

@@ -1,9 +1,11 @@
 import type { ModuleNode, Plugin, ResolvedConfig, ViteDevServer } from 'vite'
+import type { PagesJsonPreprocessOptions } from './typed-routes'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { pagesJsonToPagesConfig, parseJsonText, resolvePagesJsonFile, resolveRouteTypesDts, writeRouteTypes } from './typed-routes'
+import process from 'node:process'
+import { pagesJsonToPagesConfig, parseJsonText, preprocessPagesJson, resolvePagesJsonFile, resolveRouteTypesDts, writeRouteTypes } from './typed-routes'
 
-export interface ViteRouterInfoOptions {
+export interface ViteRouterInfoOptions extends PagesJsonPreprocessOptions {
   /** 项目根目录，默认使用 Vite 的 root。 */
   cwd?: string
   /** pages.json 路径，相对 cwd；默认查找 src/pages.json 或 pages.json。 */
@@ -41,7 +43,10 @@ function readArray(value: unknown, label: string): Record<string, unknown>[] {
 
 function renderVirtualModule(value: Record<string, unknown>, file: string): string {
   const pages = readArray(value.pages, `${file}.pages`)
-  const subPackages = readArray(value.subPackages ?? value.subpackages, `${file}.subPackages`)
+  const subPackages = readArray(value.subPackages ?? value.subpackages, `${file}.subPackages`).map((pkg, index) => ({
+    ...pkg,
+    pages: readArray(pkg.pages, `${file}.subPackages[${index}].pages`),
+  }))
   return `export const pages = ${JSON.stringify(pages, null, 2)}
 export const subPackages = ${JSON.stringify(subPackages, null, 2)}
 export default { pages, subPackages }
@@ -59,10 +64,13 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
   const resolvedVirtualIds = virtualIds.map(id => `\0${id}`)
   let config: ResolvedConfig | undefined
   let devServer: ViteDevServer | undefined
+  let cwd = ''
+  let watchFiles: string[] = []
   let pagesJson = ''
   let dts = ''
   let moduleSource = EMPTY_MODULE
   let timer: ReturnType<typeof setTimeout> | undefined
+  let cleanupServer: (() => void) | undefined
 
   const fail = (message: string, error?: unknown): void => {
     const detail = error instanceof Error ? `：${error.message}` : ''
@@ -73,15 +81,28 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
   }
 
   const read = (): boolean => {
-    if (!pagesJson)
+    if (!cwd)
       return false
     try {
-      const value = parseJsonText(readFileSync(pagesJson, 'utf8'), pagesJson)
+      pagesJson = resolvePagesJsonFile(cwd, options.pages)
+      dts = options.dts === false ? '' : resolveRouteTypesDts(cwd, pagesJson, options.dts)
+      const source = preprocessPagesJson(readFileSync(pagesJson, 'utf8'), {
+        platform: options.platform ?? process.env.UNI_PLATFORM,
+        defines: options.defines,
+      })
+      const value = parseJsonText(source, pagesJson)
       if (!isRecord(value))
         throw new Error(`${pagesJson} 顶层必须是对象。`)
+      const pagesConfig = pagesJsonToPagesConfig(value, pagesJson)
       const nextSource = renderVirtualModule(value, pagesJson)
-      if (dts)
-        writeRouteTypes(pagesJsonToPagesConfig(value, pagesJson), { dts, strict: options.strict })
+      if (dts) {
+        try {
+          writeRouteTypes(pagesConfig, { dts, strict: options.strict })
+        }
+        catch (error) {
+          fail(`生成路由类型失败（${dts}）`, error)
+        }
+      }
       const changed = nextSource !== moduleSource
       moduleSource = nextSource
       return changed
@@ -109,8 +130,24 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
       clearTimeout(timer)
     timer = setTimeout(() => {
       timer = undefined
-      if (read())
-        reload()
+      try {
+        if (read())
+          reload()
+      }
+      catch (error) {
+        const cause = error instanceof Error ? error : new Error(String(error))
+        const message = `[@wot-ui/router] 读取路由信息失败（${pagesJson}）：${cause.message}`
+        config?.logger.error(message)
+        devServer?.ws.send({
+          type: 'error',
+          err: {
+            message,
+            stack: cause.stack || '',
+            id: pagesJson,
+            plugin: 'vite-plugin-uni-router-info',
+          },
+        })
+      }
     }, 50)
   }
 
@@ -119,21 +156,12 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
     enforce: 'pre',
     configResolved(resolved) {
       config = resolved
-      try {
-        const cwd = resolve(options.cwd ?? resolved.root)
-        pagesJson = resolvePagesJsonFile(cwd, options.pages)
-        dts = options.dts === false ? '' : resolveRouteTypesDts(cwd, pagesJson, options.dts)
-      }
-      catch (error) {
-        fail('初始化路由信息失败', error)
-        return
-      }
+      cwd = resolve(options.cwd ?? resolved.root)
+      watchFiles = options.pages ? [resolve(cwd, options.pages)] : [resolve(cwd, 'src/pages.json'), resolve(cwd, 'pages.json')]
       read()
     },
     buildStart() {
-      if (!pagesJson)
-        return
-      this.addWatchFile(pagesJson)
+      watchFiles.forEach(file => this.addWatchFile(file))
       read()
     },
     resolveId(id) {
@@ -147,21 +175,36 @@ export function viteRouterInfo(options: ViteRouterInfoOptions = {}): Plugin {
       return resolvedVirtualIds.includes(id) ? moduleSource : null
     },
     watchChange(id) {
-      if (pagesJson && resolve(id.split('?')[0]) === pagesJson)
+      if (watchFiles.includes(resolve(id.split('?')[0])))
         schedule()
     },
     configureServer(server) {
-      if (!pagesJson)
+      if (!watchFiles.length)
         return
+      cleanupServer?.()
       devServer = server
-      server.watcher.add(pagesJson)
+      server.watcher.add(watchFiles)
       const onChange = (file: string) => {
-        if (resolve(file) === pagesJson)
+        if (watchFiles.includes(resolve(file)))
           schedule()
       }
       server.watcher.on('add', onChange)
       server.watcher.on('change', onChange)
       server.watcher.on('unlink', onChange)
+      cleanupServer = () => {
+        server.watcher.off('add', onChange)
+        server.watcher.off('change', onChange)
+        server.watcher.off('unlink', onChange)
+        devServer = undefined
+        cleanupServer = undefined
+      }
+    },
+    closeBundle() {
+      if (timer) {
+        clearTimeout(timer)
+        timer = undefined
+      }
+      cleanupServer?.()
     },
   }
 }

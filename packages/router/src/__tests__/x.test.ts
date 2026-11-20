@@ -94,6 +94,26 @@ function emit(path: string, query: LocationQuery = {}) {
     listener({ path, query })
 }
 
+function mockUniH5Navigation(nativeRouter: {
+  push: (to: { path: string, query: Record<string, string> }) => Promise<unknown>
+}) {
+  vi.mocked(uni.navigateTo).mockImplementation(({ url, success, fail }: any) => {
+    const [path, search = ''] = url.split('?')
+    const query = Object.fromEntries(
+      search.split('&').filter(Boolean).map((pair: string) => {
+        const index = pair.indexOf('=')
+        return index === -1 ? [pair, ''] : [pair.slice(0, index), pair.slice(index + 1)]
+      }),
+    )
+    nativeRouter.push({ path, query }).then((result) => {
+      if (result === false || result instanceof Error)
+        fail?.({ errMsg: 'cancelled' })
+      else
+        success?.()
+    }, fail)
+  })
+}
+
 beforeEach(() => {
   listeners = new Set()
   pages = []
@@ -136,6 +156,8 @@ describe('uni-app x adapter', () => {
     expect(router.currentRoute.value.fullPath).toBe('/pages/detail?id=1&text=%E4%B8%AD%E6%96%87%25%26')
     emit('pages/detail', { id: '1', text: '%E4%B8%AD%E6%96%87%25%26' })
     expect(after).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.query).toEqual({ id: '1', text: '中文%&' })
+    expect(router.currentRoute.value.fullPath).toBe('/pages/detail?id=1&text=%E4%B8%AD%E6%96%87%25%26')
   })
 
   it('recognizes WeChat VDOM when onAppRoute arrives before the page stack', () => {
@@ -254,10 +276,10 @@ describe('uni-app x adapter', () => {
     await expect(router.push('/pages/detail')).rejects.toThrow('NavigationCancelled')
     expect(uni.navigateTo).not.toHaveBeenCalled()
     remove()
-    const guard = vi.fn(async () => '/pages/home')
+    const guard = vi.fn(async to => to.path === '/pages/detail' ? '/pages/home' : undefined)
     router.beforeEach(guard)
     await router.push('/pages/detail')
-    expect(guard).toHaveBeenCalledOnce()
+    expect(guard).toHaveBeenCalledTimes(2)
     expect(uni.navigateTo).toHaveBeenCalledWith(expect.objectContaining({ url: '/pages/home' }))
     // API success alone does not synthesize a page lifecycle or route event.
     expect(router.currentRoute.value.path).toBe('/')
@@ -343,6 +365,8 @@ describe('uni-app x adapter', () => {
 
     emit('pages/detail', { id: '1', text: '%E4%B8%AD%E6%96%87%25%26' })
     expect(after).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.query).toEqual({ id: '1', text: '中文%&' })
+    expect(router.currentRoute.value.fullPath).toBe(expected)
   })
 
   it('restores the raw query before Uni H5 re-encodes navigation URLs', async () => {
@@ -421,6 +445,100 @@ describe('uni-app x adapter', () => {
     await nativeRouter.push({ path: '/pages/detail', query: {}, meta: {} })
 
     expect(order).toEqual(['beforeEach', 'beforeEnter', 'beforeResolve'])
+  })
+
+  it.each(['%', '%41', '中文%&'])('preserves committed query %s when leaving and returning through history', async (text) => {
+    const { router, app } = setup()
+    const before = vi.fn()
+    const after = vi.fn()
+    router.beforeEach(before)
+    router.afterEach(after)
+    const nativeRouter = createVueRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: {}, meta: { route: 'pages/home' } },
+        { path: '/pages/detail', component: {}, meta: { route: 'pages/detail' } },
+      ],
+    })
+    app.use(nativeRouter)
+    await nativeRouter.isReady()
+    mockUniH5Navigation(nativeRouter)
+
+    await router.push({ path: '/pages/detail', query: { text } })
+    await nativeRouter.push('/')
+
+    expect(before).toHaveBeenLastCalledWith(
+      expect.objectContaining({ path: '/pages/home' }),
+      expect.objectContaining({ query: { text } }),
+      expect.any(Function),
+    )
+    expect(after).toHaveBeenLastCalledWith(
+      expect.objectContaining({ path: '/pages/home' }),
+      expect.objectContaining({ query: { text } }),
+    )
+
+    const returned = new Promise<void>((resolve) => {
+      const remove = nativeRouter.afterEach(() => {
+        remove()
+        resolve()
+      })
+    })
+    nativeRouter.back()
+    await returned
+
+    expect(before).toHaveBeenLastCalledWith(
+      expect.objectContaining({ query: { text } }),
+      expect.objectContaining({ path: '/pages/home' }),
+      expect.any(Function),
+    )
+    expect(router.currentRoute.value.query).toEqual({ text })
+    expect(router.currentRoute.value.fullPath).toBe(`/pages/detail?text=${encodeURIComponent(text)}`)
+  })
+
+  it('does not apply a completed navigation query to a new literal-percent navigation', async () => {
+    const { router, app } = setup()
+    const nativeRouter = new FakeVueRouter()
+    app.use(nativeRouter)
+    mockUniH5Navigation(nativeRouter)
+
+    await router.push({ path: '/pages/detail', query: { text: '%' } })
+    await nativeRouter.push('/pages/home')
+    await nativeRouter.push({ path: '/pages/detail', query: { text: '%25' } })
+
+    expect(router.currentRoute.value.query).toEqual({ text: '%25' })
+    expect(router.currentRoute.value.fullPath).toBe('/pages/detail?text=%2525')
+  })
+
+  it('keeps active navigation query records while an async guard runs longer than a minute', async () => {
+    const { router, app } = setup()
+    const nativeRouter = new FakeVueRouter()
+    app.use(nativeRouter)
+    mockUniH5Navigation(nativeRouter)
+    let release: (() => void) | undefined
+    router.beforeEach(() => new Promise<void>((resolve) => {
+      release = resolve
+    }))
+
+    const navigation = router.push({ path: '/pages/detail', query: { text: '%' } })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001)
+    release!()
+    await navigation
+
+    expect(router.currentRoute.value.query).toEqual({ text: '%' })
+    expect(router.currentRoute.value.fullPath).toBe('/pages/detail?text=%25')
+  })
+
+  it('clears a failed native navigation query before a later direct navigation', async () => {
+    const { router, app } = setup()
+    const nativeRouter = new FakeVueRouter()
+    app.use(nativeRouter)
+    vi.mocked(uni.navigateTo).mockImplementation(({ fail }: any) => fail?.({ errMsg: 'failure' }))
+
+    await expect(router.push({ path: '/pages/detail', query: { text: '%' } })).rejects.toThrow('failure')
+    await nativeRouter.push({ path: '/pages/detail', query: { text: '%25' } })
+
+    expect(router.currentRoute.value.query).toEqual({ text: '%25' })
   })
 
   it('keeps cancellation and redirect semantics when Vue Router owns the guard host', async () => {
@@ -553,6 +671,8 @@ describe('uni-app x adapter', () => {
   it('removes H5 vue-router hooks on dispose', () => {
     const { router, app } = setup()
     const nativeRouter = new FakeVueRouter()
+    const removeHistory = vi.fn()
+    Object.assign(nativeRouter, { options: { history: { listen: () => removeHistory } } })
     app.use(nativeRouter)
     expect(nativeRouter.beforeGuards).toHaveLength(1)
     expect(nativeRouter.afterGuards).toHaveLength(1)
@@ -561,5 +681,6 @@ describe('uni-app x adapter', () => {
 
     expect(nativeRouter.beforeGuards).toHaveLength(0)
     expect(nativeRouter.afterGuards).toHaveLength(0)
+    expect(removeHistory).toHaveBeenCalledOnce()
   })
 })

@@ -2,13 +2,16 @@
 
 import { mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { platform, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import prettier from 'prettier'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   generateRouteTypes,
   pagesJsonToPagesConfig,
+  parseJsonText,
+  preprocessPagesJson,
   readPagesJson,
+  resolveRouteTypesDts,
   writeRouteTypes,
   writeRouteTypesFromPagesJson,
 } from '../typed-routes'
@@ -230,6 +233,152 @@ describe('路由类型生成', () => {
 })
 
 describe('pages.json 读取', () => {
+  it.each([
+    '{"pages":[],"flag":tr/**/ue}',
+    '{"pages":[]} /* unfinished',
+    '{"pages":[,]}',
+    '{"pages":[],}',
+  ])('保留 JSONC token 边界并校验尾逗号 %s', (source) => {
+    if (source === '{"pages":[],}')
+      expect(parseJsonText(source)).toEqual({ pages: [] })
+    else
+      expect(() => parseJsonText(source)).toThrow('无法解析')
+  })
+
+  it('允许闭合块注释位于 token 之间', () => {
+    expect(parseJsonText('{"pages"/* comment */:/* comment */[]}')).toEqual({ pages: [] })
+  })
+
+  it.each(['h5', 'mp-weixin', 'app-android'])('按 %s 过滤嵌套条件区块并支持平台别名', (target) => {
+    const source = `{"pages":[
+      {"path":"common"},
+      // #ifdef H5 || MP-WEIXIN
+      {"path":"web-or-wechat"},
+      // #ifdef WEB
+      {"path":"web"},
+      // #endif
+      // #endif
+      // #ifndef H5 || MP
+      {"path":"app"},
+      // #endif
+    ]}`
+    const value = pagesJsonToPagesConfig(parseJsonText(preprocessPagesJson(source, { platform: target })))
+    expect(value.pages?.map(page => page.path)).toEqual(target === 'h5'
+      ? ['common', 'web-or-wechat', 'web']
+      : target === 'mp-weixin' ? ['common', 'web-or-wechat'] : ['common', 'app'])
+  })
+
+  it('支持显式标识与逻辑分组，不执行表达式中的代码', () => {
+    const source = '// #ifdef (FEATURE && !MP) || H5\n{"pages":[]}\n// #endif'
+    expect(parseJsonText(preprocessPagesJson(source, { platform: 'app', defines: ['FEATURE'] }))).toEqual({ pages: [] })
+    expect(() => preprocessPagesJson('// #ifdef process.exit()\n// #endif', { platform: 'h5' })).toThrow('不支持')
+  })
+
+  it.each(['// #', '/* #'])('支持 %s 条件注释的 else 分支且不泄漏嵌套的禁用内容', (prefix) => {
+    const directive = (value: string) => `${prefix}${value}${prefix.startsWith('/*') ? ' */' : ''}`
+    const source = `{"pages":[
+      ${directive('ifdef H5')}
+      {"path":"web"},
+      ${directive('else')}
+      {"path":"native"},
+      ${directive('ifdef MP')}
+      {"path":"mini"},
+      ${directive('else')}
+      {"path":"app"},
+      ${directive('endif')}
+      ${directive('endif')}
+    ]}`
+    for (const [platform, expected] of [['h5', ['web']], ['mp-weixin', ['native', 'mini']], ['app', ['native', 'app']]] as const) {
+      const result = pagesJsonToPagesConfig(parseJsonText(preprocessPagesJson(source, { platform })))
+      expect(result.pages?.map(page => page.path)).toEqual(expected)
+    }
+  })
+
+  it.each(['app', 'app-plus'])('条件编译读取 %s 平台、自定义上下文与 x 标识', (target) => {
+    vi.stubEnv('UNI_PLATFORM', target)
+    vi.stubEnv('UNI_APP_X', 'true')
+    vi.stubEnv('UNI_UTS_PLATFORM', 'app-ios')
+    vi.stubEnv('UNI_CUSTOM_CONTEXT', '{"CUSTOM":true,"VUE3":false,"UNI_APP_X":false,"APP_UVUE":false,"APP_IOS":false}')
+    try {
+      const result = preprocessPagesJson(`// #ifdef APP && APP-IOS && UNI_APP_X && CUSTOM && VUE3 && APP-UVUE && !APP-PLUS
+{"pages":[]}
+// #endif`)
+      expect(parseJsonText(result)).toEqual({ pages: [] })
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('普通 App 的 JSON 条件上下文包含 APP_VUE', () => {
+    vi.stubEnv('UNI_APP_X', '')
+    vi.stubEnv('UNI_CUSTOM_CONTEXT', '')
+    try {
+      expect(parseJsonText(preprocessPagesJson('// #ifdef APP-VUE\n{}\n// #endif', { platform: 'app' }))).toEqual({})
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it.each(['true', 'false'])('对齐 5.36 SDK 的 Vapor 与鸿蒙 JSVM 固有上下文（DOM2=%s）', (enabled) => {
+    vi.stubEnv('UNI_APP_X', 'true')
+    vi.stubEnv('UNI_APP_X_DOM2', enabled)
+    vi.stubEnv('UNI_APP_X_HARMONY_SCRIPT_ENGINE', 'jsvm')
+    vi.stubEnv('UNI_CUSTOM_CONTEXT', '{"VUE3_VAPOR":true,"APP_HARMONY_JSVM":true}')
+    try {
+      const source = `{"pages":[
+        {"path":"common"},
+        // #ifdef VUE3-VAPOR && APP-HARMONY-JSVM
+        {"path":"vapor-jsvm"},
+        // #endif
+      ]}`
+      const config = pagesJsonToPagesConfig(parseJsonText(preprocessPagesJson(source, { platform: 'app-harmony' })))
+      expect(config.pages?.map(page => page.path)).toEqual(enabled === 'true' ? ['common', 'vapor-jsvm'] : ['common'])
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('缺少平台或条件区块不闭合时明确报错', () => {
+    vi.stubEnv('UNI_PLATFORM', '')
+    try {
+      expect(() => preprocessPagesJson('// #ifdef H5\n{}\n// #endif')).toThrow('UNI_PLATFORM')
+      expect(() => preprocessPagesJson('// #ifdef H5\n{}', { platform: 'h5' })).toThrow('缺少 #endif')
+      expect(() => preprocessPagesJson('// #endif', { platform: 'h5' })).toThrow('不匹配')
+      expect(() => preprocessPagesJson('// #if uniVersion > 4\n{}\n// #endif', { platform: 'h5' })).toThrow('不支持 #if')
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('嵌套 src 配置的默认声明仍位于 src，且不误判相似目录', () => {
+    const cwd = resolve('router-types-project')
+    expect(resolveRouteTypesDts(cwd, resolve(cwd, 'src/config/pages.json'))).toBe(resolve(cwd, 'src/typed-router.d.ts'))
+    expect(resolveRouteTypesDts(cwd, resolve(cwd, 'src-other/pages.json'))).toBe(resolve(cwd, 'typed-router.d.ts'))
+  })
+
+  it('拒绝声明与 pages.json 指向同一路径，保留配置原文', async () => {
+    const fs = await vi.importActual<typeof import('node:fs')>('node:fs')
+    const directory = mkdtempSync(join(tmpdir(), 'router-types-'))
+    const pagesJson = join(directory, 'pages.json')
+    const source = '{"pages":[{"path":"home"}]}'
+    try {
+      fs.writeFileSync(pagesJson, source)
+      expect(() => resolveRouteTypesDts(directory, pagesJson, './pages.json')).toThrow('同一文件')
+      expect(() => writeRouteTypesFromPagesJson({ pagesJson, dts: pagesJson })).toThrow('同一文件')
+      const alias = join(directory, 'alias.json')
+      fs.linkSync(pagesJson, alias)
+      expect(() => writeRouteTypesFromPagesJson({ pagesJson, dts: alias })).toThrow('同一文件')
+      expect(readFileSync(pagesJson, 'utf8')).toBe(source)
+    }
+    finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   it('读取主包、分包、name 与 aliasPath，并兼容 subpackages 写法', () => {
     const config = pagesJsonToPagesConfig({
       pages: [{ path: 'pages/home/index', name: 'home', aliasPath: '/home', style: { navigationBarTitleText: '首页' } }],

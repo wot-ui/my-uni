@@ -54,6 +54,12 @@ interface NativeRoute {
 
 interface VueRouterLike {
   readonly currentRoute: { value: NativeRoute }
+  options?: {
+    history?: {
+      state?: Record<string, unknown>
+      listen: (callback: (to: string, from: string, info: { type: string }) => void) => () => void
+    }
+  }
   beforeEach: (guard: (to: NativeRoute, from: NativeRoute) => unknown) => () => void
   afterEach: (guard: (to: NativeRoute, from: NativeRoute, failure?: unknown) => void) => () => void
   getRoutes: () => unknown[]
@@ -71,7 +77,6 @@ interface PendingNavigation {
   path: string
   query: LocationQuery
   encodedQuery: LocationQuery
-  expiresAt: number
 }
 
 interface AppWithH5Router extends App {
@@ -79,8 +84,6 @@ interface AppWithH5Router extends App {
 }
 
 const installations = new WeakMap<App, () => void>()
-const pendingNavigationTtl = 60_000
-const pendingNavigationLimit = 16
 
 function isVueRouterLike(value: unknown): value is VueRouterLike {
   if (!value || typeof value !== 'object')
@@ -159,16 +162,7 @@ function encodeQuery(query: LocationQuery): LocationQuery {
   )
 }
 
-function prunePendingNavigations(navigations: PendingNavigation[]) {
-  const now = Date.now()
-  for (let index = navigations.length - 1; index >= 0; index--) {
-    if (navigations[index].expiresAt <= now)
-      navigations.splice(index, 1)
-  }
-}
-
 function findPendingNavigation(navigations: PendingNavigation[], path: string, query: LocationQuery) {
-  prunePendingNavigations(navigations)
   for (let index = navigations.length - 1; index >= 0; index--) {
     const pending = navigations[index]
     if (pending.path !== path)
@@ -203,6 +197,8 @@ export function createRouter(options: RouterOptions): RouterX {
   let cleanupVueRouter: (() => void) | undefined
   let bridgeGuardError: Error | undefined
   const pendingNavigations: PendingNavigation[] = []
+  let committedRouteQueries = new WeakMap<NativeRoute, LocationQuery>()
+  const historyQueries = new Map<string, LocationQuery>()
   const router: RouterX = Object.assign(createRouterCore(options, install), {
     syncRoute,
     dispose,
@@ -212,18 +208,16 @@ export function createRouter(options: RouterOptions): RouterX {
   function wrapNavigation(method: 'push' | 'replace' | 'replaceAll' | 'pushTab') {
     const navigate = router[method]
     router[method] = async (to: RouteLocationRaw) => {
+      let pending: PendingNavigation | undefined
       if (cleanupVueRouter) {
         try {
           const resolved = internals.resolve(to)
-          prunePendingNavigations(pendingNavigations)
-          pendingNavigations.push({
+          pending = {
             path: resolved.path,
             query: { ...resolved.query },
             encodedQuery: encodeQuery(resolved.query),
-            expiresAt: Date.now() + pendingNavigationTtl,
-          })
-          if (pendingNavigations.length > pendingNavigationLimit)
-            pendingNavigations.splice(0, pendingNavigations.length - pendingNavigationLimit)
+          }
+          pendingNavigations.push(pending)
         }
         catch {
           // 路由校验交给核心导航方法处理，避免改变已有错误语义。
@@ -237,6 +231,9 @@ export function createRouter(options: RouterOptions): RouterX {
         const guardError = bridgeGuardError
         bridgeGuardError = undefined
         throw guardError || error
+      }
+      finally {
+        consumePendingNavigation(pendingNavigations, pending)
       }
     }
   }
@@ -259,15 +256,17 @@ export function createRouter(options: RouterOptions): RouterX {
     installedApp = undefined
     updateRoute = undefined
     pendingNavigations.splice(0)
+    committedRouteQueries = new WeakMap()
+    historyQueries.clear()
   }
 
-  function normalizeNativeRoute(route: NativeRoute): RouteLocationNormalized {
+  function normalizeNativeRoute(route: NativeRoute, historyQuery?: LocationQuery): RouteLocationNormalized {
     const metaRoute = route.meta?.route
     const path = typeof metaRoute === 'string' && metaRoute
       ? `/${metaRoute.replace(/^\/+/, '')}`
       : route.path || '/'
     const pending = findPendingNavigation(pendingNavigations, path, route.query || {})
-    const query = { ...(pending?.query || route.query || {}) } as LocationQuery
+    const query = { ...(committedRouteQueries.get(route) || pending?.query || historyQuery || route.query || {}) } as LocationQuery
     try {
       const resolved = internals.resolve({ path, query })
       return {
@@ -313,10 +312,26 @@ export function createRouter(options: RouterOptions): RouterX {
 
     let removeBefore: (() => void) | undefined
     let removeAfter: (() => void) | undefined
+    let removeHistory: (() => void) | undefined
+    let historyTarget: string | undefined
+    const history = nativeRouter.options?.history
+    const historyKey = (route: NativeRoute) => JSON.stringify([
+      history?.state?.position,
+      route.path,
+      Object.entries(route.query || {}).sort(([left], [right]) => left.localeCompare(right)),
+    ])
+    const queryForHistory = (route: NativeRoute) => historyTarget && route.fullPath === historyTarget
+      ? historyQueries.get(historyKey(route))
+      : undefined
     try {
+      if (typeof history?.listen === 'function') {
+        removeHistory = history.listen((to, _from, info) => {
+          historyTarget = info.type === 'pop' ? to : undefined
+        })
+      }
       removeBefore = nativeRouter.beforeEach(async (to, from) => {
         try {
-          await internals.runBeforeGuards(normalizeNativeRoute(to), normalizeNativeRoute(from))
+          await internals.runBeforeGuards(normalizeNativeRoute(to, queryForHistory(to)), normalizeNativeRoute(from))
           bridgeGuardError = undefined
           return true
         }
@@ -332,7 +347,8 @@ export function createRouter(options: RouterOptions): RouterX {
         }
       })
       removeAfter = nativeRouter.afterEach((to, from, failure) => {
-        const nextRoute = normalizeNativeRoute(to)
+        const nextRoute = normalizeNativeRoute(to, queryForHistory(to))
+        historyTarget = undefined
         consumePendingNavigation(
           pendingNavigations,
           findPendingNavigation(pendingNavigations, nextRoute.path, to.query || {}),
@@ -340,6 +356,8 @@ export function createRouter(options: RouterOptions): RouterX {
         if (failure)
           return
         const previousRoute = normalizeNativeRoute(from)
+        committedRouteQueries.set(to, { ...nextRoute.query })
+        historyQueries.set(historyKey(to), { ...nextRoute.query })
         internals.syncRoute(nextRoute.path, nextRoute.query)
         internals.runAfterGuards(nextRoute, previousRoute)
       })
@@ -347,6 +365,7 @@ export function createRouter(options: RouterOptions): RouterX {
       cleanupVueRouter = () => {
         removeBefore?.()
         removeAfter?.()
+        removeHistory?.()
         internals.setGuardHost('core')
         cleanupVueRouter = undefined
       }
@@ -355,6 +374,7 @@ export function createRouter(options: RouterOptions): RouterX {
     catch (error) {
       removeBefore?.()
       removeAfter?.()
+      removeHistory?.()
       console.warn('[@wot-ui/router/x] H5 vue-router 守卫桥接失败，将继续使用内置守卫。', error)
       return false
     }
@@ -384,7 +404,7 @@ export function createRouter(options: RouterOptions): RouterX {
     const appWithH5Router = app as AppWithH5Router
     let restoreH5Hooks: (() => void) | undefined
     const callback = (event: AppRouteEvent) => {
-      if (active && event.path)
+      if (active && !cleanupVueRouter && event.path)
         sync(`/${event.path.replace(/^\/+/, '')}`, normalizePageQuery(event.query))
     }
     onAppRoute(callback)

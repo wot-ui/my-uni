@@ -19,9 +19,13 @@ declare namespace WotRouterPages {
 declare module 'virtual:uni-pages' {
   export const pages: WotRouterPages.PageRoute[]
   export const subPackages: WotRouterPages.SubPackage[]
+  const config: { pages: typeof pages, subPackages: typeof subPackages }
+  export default config
 }
 
 declare module 'virtual:wot-pages' {
   export const pages: WotRouterPages.PageRoute[]
   export const subPackages: WotRouterPages.SubPackage[]
+  const config: { pages: typeof pages, subPackages: typeof subPackages }
+  export default config
 }

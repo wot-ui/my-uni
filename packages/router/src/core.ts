@@ -10,6 +10,7 @@ import type {
   RouteLocationObject,
   RouteLocationRaw,
   Router,
+  RouteRecordRaw,
   RouterOptions,
 } from './types'
 import { shallowRef, unref } from 'vue'
@@ -47,6 +48,7 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     meta: {},
     style: {},
   })
+  const initialRoute = unref(currentRoute)
   const routes = options.routes || []
   const beforeGuards: NavigationGuard[] = []
   const beforeResolveGuards: NavigationGuard[] = []
@@ -159,19 +161,25 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     }
   }
 
-  async function navigate(to: RouteLocationRaw, type: NavType, skipGuards = false) {
+  async function navigate(to: RouteLocationRaw, type: NavType, redirectCount = 0): Promise<void> {
+    const finalType = (typeof to === 'object' && to.navType) || type || 'push'
+    if (finalType === 'back')
+      return performUniNavigate(finalType, '', typeof to === 'object' ? to : undefined)
+
     const targetLocation = resolve(to)
     const fromLocation = unref(currentRoute)
 
     // 1. 执行前置守卫
-    if (!skipGuards && guardHost === 'core') {
+    if (guardHost === 'core') {
       try {
         await runBeforeNavigation(targetLocation, fromLocation)
       }
       catch (error: any) {
         if (error && (error.message === 'NavigationCancelled' || error.message === 'NavigationRedirect')) {
           if (error.message === 'NavigationRedirect' && error.to) {
-            return navigate(error.to, type, true)
+            if (redirectCount >= 20)
+              throw new Error('NavigationRedirectLoop')
+            return navigate(error.to, type, redirectCount + 1)
           }
           return Promise.reject(error)
         }
@@ -181,10 +189,6 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
 
     // 2. 执行实际跳转
     const url = targetLocation.fullPath
-    // 优先使用参数中的 navType
-    const finalType
-      = (typeof to === 'object' && to.navType) || type || 'push'
-
     try {
       await performUniNavigate(finalType, url, typeof to === 'object' ? to : undefined)
 
@@ -202,11 +206,22 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     }
   }
 
-  function getBeforeEnterGuards(path: string): NavigationGuard[] {
-    const route = routes.find(r => r.path === path || r.aliasPath === path)
-    if (!route?.beforeEnter)
+  function matchedRoute(location: RouteLocationNormalized): RouteRecordRaw | undefined {
+    if (location === initialRoute)
+      return undefined
+    return location.name
+      ? routes.find(route => route.name === location.name)
+      : routes.find(route => route.path === location.path || route.aliasPath === location.path)
+  }
+
+  function getBeforeEnterGuards(location: RouteLocationNormalized, from: RouteLocationNormalized): NavigationGuard[] {
+    const matched = matchedRoute(location)
+    if (matched && matched === matchedRoute(from))
       return []
-    return Array.isArray(route.beforeEnter) ? route.beforeEnter : [route.beforeEnter]
+    const beforeEnter = location.beforeEnter as NavigationGuard | NavigationGuard[] | undefined
+    if (!beforeEnter)
+      return []
+    return Array.isArray(beforeEnter) ? beforeEnter : [beforeEnter]
   }
 
   async function runBeforeNavigation(
@@ -214,7 +229,7 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     from: RouteLocationNormalized,
   ) {
     await runGuardQueue(beforeGuards, to, from)
-    await runGuardQueue(getBeforeEnterGuards(to.path), to, from)
+    await runGuardQueue(getBeforeEnterGuards(to, from), to, from)
     await runGuardQueue(beforeResolveGuards, to, from)
   }
 
@@ -283,7 +298,7 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     to: RouteLocationNormalized,
     from: RouteLocationNormalized,
   ) {
-    for (const guard of guards) {
+    for (const guard of [...guards]) {
       await new Promise<void>((resolve, reject) => {
         const next: NavigationGuardNext = (val) => {
           ;(next as any)._called = true
@@ -395,7 +410,7 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     const newFullPath = stringifyQuery(newPath, q)
 
     // 如果当前路由已经是最新，则跳过更新（避免重复触发）
-    if (router.currentRoute.value.fullPath === newFullPath) {
+    if (router.currentRoute.value.fullPath === newFullPath && sameQuery(router.currentRoute.value.query, q)) {
       return
     }
 
@@ -427,6 +442,19 @@ export function createRouterCore(options: RouterOptions, install: InstallRouter)
     // H5 由 vue-router 托管前置/后置守卫时，避免同一轮导航重复触发 afterEach。
     if (guardHost === 'core')
       afterGuards.forEach(guard => guard(to, from))
+  }
+
+  function sameQuery(left: LocationQuery, right: LocationQuery): boolean {
+    const keys = Object.keys(left)
+    return keys.length === Object.keys(right).length && keys.every((key) => {
+      if (!Object.prototype.hasOwnProperty.call(right, key))
+        return false
+      const leftValue = left[key]
+      const rightValue = right[key]
+      if (Array.isArray(leftValue) && Array.isArray(rightValue))
+        return leftValue.length === rightValue.length && leftValue.every((value, index) => Object.is(value, rightValue[index]))
+      return Object.is(leftValue, rightValue)
+    })
   }
 
   return router

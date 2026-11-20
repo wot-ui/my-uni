@@ -3,14 +3,16 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const example = resolve(root, 'examples/router-x')
 const staging = mkdtempSync(resolve(tmpdir(), 'router-x-pack-'))
 const packageRoot = resolve(root, 'packages/router')
-execFileSync('pnpm', ['build'], { cwd: packageRoot, stdio: 'inherit' })
-execFileSync('pnpm', ['pack', '--pack-destination', staging], { cwd: packageRoot, stdio: 'inherit' })
+const shell = process.platform === 'win32'
+execFileSync('pnpm', ['build'], { cwd: packageRoot, stdio: 'inherit', shell })
+execFileSync('pnpm', ['pack', '--pack-destination', shell ? `"${staging}"` : staging], { cwd: packageRoot, stdio: 'inherit', shell })
 const version = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')).version
 const tarball = resolve(staging, `wot-ui-router-${version}.tgz`)
 const destination = resolve(example, 'node_modules/@wot-ui/router')

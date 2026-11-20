@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { platform } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import process from 'node:process'
 
 export interface RouteTypePage {
   path: string
@@ -112,8 +113,14 @@ function stripJsonComments(text: string): string {
     }
     if (char === '/' && next === '*') {
       index += 2
-      while (index < text.length && !(text[index] === '*' && text[index + 1] === '/'))
+      result += ' '
+      while (index < text.length && !(text[index] === '*' && text[index + 1] === '/')) {
+        if (text[index] === '\n' || text[index] === '\r')
+          result += text[index]
         index++
+      }
+      if (index >= text.length)
+        throw new Error('块注释未闭合。')
       index++
       continue
     }
@@ -127,6 +134,7 @@ function stripTrailingCommas(text: string): string {
   let result = ''
   let inString = false
   let escaped = false
+  let previous = ''
   for (let index = 0; index < text.length; index++) {
     const char = text[index]
     if (inString) {
@@ -141,6 +149,7 @@ function stripTrailingCommas(text: string): string {
     }
     if (char === '"') {
       inString = true
+      previous = char
       result += char
       continue
     }
@@ -148,10 +157,12 @@ function stripTrailingCommas(text: string): string {
       let lookahead = index + 1
       while (lookahead < text.length && /\s/.test(text[lookahead]))
         lookahead++
-      if (text[lookahead] === '}' || text[lookahead] === ']')
+      if ((text[lookahead] === '}' || text[lookahead] === ']') && previous && !['[', '{', ',', ':'].includes(previous))
         continue
     }
     result += char
+    if (!/\s/.test(char))
+      previous = char
   }
   return result
 }
@@ -176,6 +187,149 @@ export function parseJsonText(text: string, file = 'JSON'): unknown {
   return parsePagesJsonText(text, file)
 }
 
+export interface PagesJsonPreprocessOptions {
+  /** 当前 uni 编译目标；默认读取 UNI_PLATFORM。 */
+  platform?: string
+  /** 额外启用的条件编译标识。 */
+  defines?: readonly string[]
+}
+
+function matchesCondition(expression: string, defines: Set<string>): boolean {
+  const tokens = expression.match(/[A-Z_][\w-]*|\|\||&&|[!()]/gi) ?? []
+  if (!tokens.length || tokens.join('') !== expression.replace(/\s/g, ''))
+    throw new Error(`不支持的条件编译表达式：${expression}`)
+  let position = 0
+  function operand(): boolean {
+    const token = tokens[position++]
+    if (token === '!')
+      return !operand()
+    if (token === '(') {
+      const value = disjunction()
+      if (tokens[position++] !== ')')
+        throw new Error(`条件编译表达式缺少右括号：${expression}`)
+      return value
+    }
+    if (!token || !/^[A-Z_][\w-]*$/i.test(token))
+      throw new Error(`无效的条件编译表达式：${expression}`)
+    return defines.has(token.replace(/-/g, '_').toUpperCase())
+  }
+  function conjunction(): boolean {
+    let value = operand()
+    while (tokens[position] === '&&') {
+      position++
+      const right = operand()
+      value = value && right
+    }
+    return value
+  }
+  function disjunction(): boolean {
+    let value = conjunction()
+    while (tokens[position] === '||') {
+      position++
+      const right = conjunction()
+      value = value || right
+    }
+    return value
+  }
+  const value = disjunction()
+  if (position !== tokens.length)
+    throw new Error(`无效的条件编译表达式：${expression}`)
+  return value
+}
+
+/** 仅过滤 pages.json 的条件区块，不修改源文件。虚拟模块与声明须复用同一结果。 */
+export function preprocessPagesJson(source: string, options: PagesJsonPreprocessOptions = {}): string {
+  if (!/^\s*(?:\/\/|\/\*)\s*#(?:if|ifdef|ifndef|elif|else|endif)\b/m.test(source))
+    return source
+  const target = (options.platform ?? process.env.UNI_PLATFORM)?.toLowerCase()
+  if (!target && !options.defines?.length)
+    throw new Error('pages.json 包含条件编译指令，请设置 UNI_PLATFORM 或指定 platform / --platform。')
+  const normalize = (value: string) => value.replace(/-/g, '_').toUpperCase()
+  const defines = new Set((options.defines ?? []).map(normalize))
+  if (target)
+    defines.add(normalize(target))
+  if (target === 'h5' || target === 'web') {
+    defines.add('H5')
+    defines.add('WEB')
+  }
+  if (target?.startsWith('mp-'))
+    defines.add('MP')
+  if (target?.startsWith('quickapp-webview'))
+    defines.add('QUICKAPP_WEBVIEW')
+  const isX = process.env.UNI_APP_X === 'true'
+  if (target === 'app' || target?.startsWith('app-')) {
+    defines.add('APP')
+    if (!isX && target !== 'app-harmony')
+      defines.add('APP_PLUS')
+    else if (isX)
+      defines.delete('APP_PLUS')
+  }
+  if (process.env.UNI_CUSTOM_CONTEXT) {
+    const context: unknown = JSON.parse(process.env.UNI_CUSTOM_CONTEXT)
+    if (isRecord(context)) {
+      for (const [key, enabled] of Object.entries(context)) {
+        if (enabled)
+          defines.add(normalize(key))
+        else
+          defines.delete(normalize(key))
+      }
+    }
+  }
+  defines.add('VUE3')
+  if (isX) {
+    defines.add('UNI_APP_X')
+    if (process.env.UNI_APP_X_DOM2 === 'true')
+      defines.add('VUE3_VAPOR')
+    else
+      defines.delete('VUE3_VAPOR')
+    if (target === 'app-harmony' && process.env.UNI_APP_X_DOM2 === 'true' && process.env.UNI_APP_X_HARMONY_SCRIPT_ENGINE === 'jsvm')
+      defines.add('APP_HARMONY_JSVM')
+    else
+      defines.delete('APP_HARMONY_JSVM')
+  }
+  if (target === 'app' || target?.startsWith('app-')) {
+    defines.add(isX ? 'APP_UVUE' : 'APP_VUE')
+    const utsPlatform = process.env.UNI_UTS_PLATFORM
+    if (isX && (utsPlatform === 'app-android' || utsPlatform === 'app-ios'))
+      defines.add(normalize(utsPlatform))
+  }
+  const active = [{ enabled: true, condition: true, alternate: false }]
+  const result = source.split(/\r?\n/).map((line, index) => {
+    const trimmed = line.trim()
+    const directiveText = trimmed.startsWith('//')
+      ? trimmed.slice(2).trim()
+      : trimmed.startsWith('/*') && trimmed.endsWith('*/') ? trimmed.slice(2, -2).trim() : ''
+    const directive = directiveText.match(/^#(if|ifdef|ifndef|elif|else|endif)\b(.*)$/)
+    if (!directive)
+      return active[active.length - 1].enabled ? line : ''
+    const command = directive[1]
+    const expression = directive[2].trim()
+    if (!['ifdef', 'ifndef', 'else', 'endif'].includes(command))
+      throw new Error(`pages.json 第 ${index + 1} 行不支持 #${command}，请使用 #ifdef / #ifndef / #else / #endif。`)
+    if (command === 'endif') {
+      if (active.length === 1 || expression)
+        throw new Error(`pages.json 第 ${index + 1} 行的 #endif 不匹配。`)
+      active.pop()
+    }
+    else if (command === 'else') {
+      const current = active[active.length - 1]
+      if (active.length === 1 || expression || current.alternate)
+        throw new Error(`pages.json 第 ${index + 1} 行的 #else 不匹配。`)
+      current.enabled = active[active.length - 2].enabled && !current.condition
+      current.alternate = true
+    }
+    else {
+      const matches = matchesCondition(expression, defines)
+      const condition = command === 'ifdef' ? matches : !matches
+      active.push({ enabled: active[active.length - 1].enabled && condition, condition, alternate: false })
+    }
+    return ''
+  })
+  if (active.length !== 1)
+    throw new Error('pages.json 条件编译区块缺少 #endif。')
+  return result.join('\n')
+}
+
 /** 把 pages.json 的内容转换为生成器输入；支持主包、分包、name 与 aliasPath。 */
 export function pagesJsonToPagesConfig(value: unknown, file = 'pages.json'): RouteTypePagesConfig {
   if (!isRecord(value))
@@ -192,8 +346,8 @@ export function pagesJsonToPagesConfig(value: unknown, file = 'pages.json'): Rou
  * pages.json 的页面项可额外提供 name / aliasPath 供类型生成使用；运行时
  * createRouter({ routes }) 仍以自身路由表为准。
  */
-export function readPagesJson(file: string): RouteTypePagesConfig {
-  return pagesJsonToPagesConfig(parsePagesJsonText(readFileSync(file, 'utf8'), file), file)
+export function readPagesJson(file: string, options: PagesJsonPreprocessOptions = {}): RouteTypePagesConfig {
+  return pagesJsonToPagesConfig(parsePagesJsonText(preprocessPagesJson(readFileSync(file, 'utf8'), options), file), file)
 }
 
 /** 在项目根目录下查找 pages.json，优先 src/pages.json，其次根目录 pages.json。 */
@@ -210,13 +364,26 @@ export function resolvePagesJsonFile(cwd: string, pages?: string): string {
 
 /** 未显式指定时，src/pages.json 输出到 src/typed-router.d.ts，根 pages.json 输出到根目录。 */
 export function resolveRouteTypesDts(cwd: string, pagesJson: string, dts?: string): string {
-  if (dts)
-    return resolve(cwd, dts)
-  const pagesDirectory = dirname(pagesJson)
   const srcDirectory = resolve(cwd, 'src')
-  if (pagesDirectory === srcDirectory || pagesJson.startsWith(`${srcDirectory}/`))
-    return resolve(srcDirectory, 'typed-router.d.ts')
-  return resolve(cwd, 'typed-router.d.ts')
+  const fromSrc = relative(srcDirectory, resolve(pagesJson))
+  const insideSrc = fromSrc !== '..' && !fromSrc.startsWith(`..${sep}`) && !isAbsolute(fromSrc)
+  const output = dts ? resolve(cwd, dts) : resolve(insideSrc ? srcDirectory : cwd, 'typed-router.d.ts')
+  assertDistinctPaths(pagesJson, output)
+  return output
+}
+
+function assertDistinctPaths(source: string, destination: string): void {
+  const input = resolve(source)
+  const output = resolve(destination)
+  const samePath = platform() === 'win32' ? input.toLowerCase() === output.toLowerCase() : input === output
+  let sameFile = false
+  if (!samePath && existsSync(input) && existsSync(output)) {
+    const inputStat = statSync(input)
+    const outputStat = statSync(output)
+    sameFile = inputStat.dev === outputStat.dev && inputStat.ino === outputStat.ino
+  }
+  if (samePath || sameFile)
+    throw new Error('声明输出 dts 不能与输入 pages.json 指向同一文件。')
 }
 
 /** 从与运行时一致的页面配置生成模块增强，不依赖特定页面扫描插件。 */
@@ -308,7 +475,7 @@ export function writeRouteTypes(config: RouteTypePagesConfig, options: RouteType
   }
 }
 
-export interface WriteRouteTypesFromPagesJsonOptions extends RouteTypeOptions {
+export interface WriteRouteTypesFromPagesJsonOptions extends RouteTypeOptions, PagesJsonPreprocessOptions {
   /** uni-app / uni-app x 项目根目录的 pages.json。 */
   pagesJson: string
   /** 生成的声明文件路径。 */
@@ -317,7 +484,8 @@ export interface WriteRouteTypesFromPagesJsonOptions extends RouteTypeOptions {
 
 /** 读取 pages.json 并生成声明，适用于没有 uni-pages 插件的 uni-app x 项目。 */
 export function writeRouteTypesFromPagesJson(options: WriteRouteTypesFromPagesJsonOptions): void {
-  writeRouteTypes(readPagesJson(options.pagesJson), {
+  assertDistinctPaths(options.pagesJson, options.dts)
+  writeRouteTypes(readPagesJson(options.pagesJson, options), {
     dts: options.dts,
     strict: options.strict,
   })

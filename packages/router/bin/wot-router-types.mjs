@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { watch } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { readPagesJson, resolvePagesJsonFile, resolveRouteTypesDts, writeRouteTypes } from '../dist/typed-routes.mjs'
 
@@ -11,6 +11,7 @@ const help = `用法: wot-router-types [选项]
 选项:
   --pages <file>   pages.json 路径，默认自动查找 src/pages.json 或 pages.json
   --dts <file>     声明输出路径，默认 src/typed-router.d.ts 或 typed-router.d.ts
+  --platform <name> 条件编译目标，默认读取 UNI_PLATFORM
   --strict         生成严格模式声明
   --watch          监听 pages.json 变化并重新生成
   --cwd <dir>      工作目录，默认当前目录
@@ -35,7 +36,7 @@ function parseArgs(argv) {
     else if (arg === '--watch') {
       options.watch = true
     }
-    else if (arg === '--pages' || arg === '--dts' || arg === '--cwd') {
+    else if (arg === '--pages' || arg === '--dts' || arg === '--cwd' || arg === '--platform') {
       const value = argv[++index]
       if (!value || value.startsWith('--'))
         throw new Error(`${arg} 缺少参数值。`)
@@ -92,7 +93,7 @@ function main() {
   }
 
   const generate = () => {
-    const config = readPagesJson(pagesJson)
+    const config = readPagesJson(pagesJson, { platform: options.platform })
     writeRouteTypes(config, { dts, strict: options.strict })
     const counts = countRoutes(config)
     console.log(`[@wot-ui/router] ${relative(cwd, pagesJson) || pagesJson} -> ${relative(cwd, dts) || dts}（${counts.paths} 个路径，${counts.names} 个名称）`)
@@ -110,15 +111,12 @@ function main() {
     return
 
   let timer
-  let pending = false
   console.log(`[@wot-ui/router] 正在监听 ${relative(cwd, pagesJson) || pagesJson}`)
-  watch(pagesJson, () => {
-    if (pending)
+  const watcher = watch(dirname(pagesJson), (_event, filename) => {
+    if (filename && resolve(dirname(pagesJson), filename.toString()) !== pagesJson)
       return
-    pending = true
     clearTimeout(timer)
     timer = setTimeout(() => {
-      pending = false
       try {
         generate()
       }
@@ -126,6 +124,11 @@ function main() {
         console.error(`[@wot-ui/router] 生成失败：${error.message}`)
       }
     }, 60)
+  })
+  watcher.on('error', (error) => {
+    clearTimeout(timer)
+    fail(`监听失败：${error.message}`)
+    watcher.close()
   })
 }
 

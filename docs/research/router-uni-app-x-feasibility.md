@@ -4,7 +4,9 @@
 
 结论（2026-11-08 研究时点）：值得进入隔离 POC。现有路径解析、查询参数、守卫队列和类型生成逻辑具有复用基础；1.2.0 的全局 mixin 状态同步方式不能作为 App Vapor 的兼容实现。建议采用共享核心与运行时适配器，先验证独立 x 入口的消费方式，再决定发行结构。该研究时点没有 x 平台的编译或运行验收结果，不能发布支持声明；后续实现与验收见[实现记录](./router-uni-app-x-implementation.md)。
 
-范围：2026-11-08 的探索记录；不迁移库、不修改公共 API、不升级旧工程依赖、不发布。源码基线为 `5de843537bd5077d3ae27c83aa2bfa7a69ff660b`，包版本 1.2.0。开始时工作区干净，未发现适用的 AGENTS.md 或既有 OpenSpec 迁移提案。本轮仅新增本研究文档；临时探针位于 `/tmp/my-uni-router-x-research/`。
+范围：2026-11-08 的探索记录；不迁移库、不修改公共 API、不升级旧工程依赖、不发布。源码基线为 `5de843537bd5077d3ae27c83aa2bfa7a69ff660b`，包版本 1.2.0。开始时工作区干净，未发现适用的 AGENTS.md 或既有 OpenSpec 迁移提案。本轮仅新增本研究文档；临时探针位于 `/tmp/my-uni-router-x-research/`（本机临时文件，未归档）。下文仓库源码链接均固定到该基线提交。
+
+后续实现注（2026-11-20）：当前 `viteRouterInfo()` 与类型生成入口已增加按平台过滤 `pages.json` 条件区块的能力，见[条件编译说明](../guide/router/typed-routes.md#pages-json-conditionals)。下文“尚未做平台过滤”等结论仍保留为研究时点的记录。
 
 ## 实际公开契约与迁移分类
 
@@ -12,21 +14,21 @@
 
 | 能力 | 1.2.0 实际行为及源码 | 分类与 x 处理 |
 | --- | --- | --- |
-| 入口 | [index.ts:15](/Users/xqk/FE/my-uni/packages/router/src/index.ts:15) 导出 `createRouter`、`useRouter`、`useRoute` 和全部 types 导出 | 可复用入口概念；内部 `resolve`、注入 key 没有从包主入口导出，不能当作既有公共 API |
-| Router 对象 | [types.ts:1506](/Users/xqk/FE/my-uni/packages/router/src/types.ts:1506)：`currentRoute`、`routes`、`push/replace/replaceAll/pushTab/back`、`beforeEach/afterEach/install` | 需保持名称、返回值和注册后取消函数语义 |
-| 路由解析 | [router.ts:36](/Users/xqk/FE/my-uni/packages/router/src/router.ts:36)：name 查表，params 替换占位符并同时序列化为 query；path 分支合并 URL 参数与 query | 纯 TS 可复用；不是完整动态路由匹配器 |
-| query 编解码 | [utils.ts:6](/Users/xqk/FE/my-uni/packages/router/src/utils.ts:6)：decodeURIComponent；stringify 时过滤 null/undefined、对 `String(value)` 编码 | 可复用；数组会转逗号字符串，重复键保留最后值，不自行升级为 Vue Router 的数组语义 |
-| 导航分发 | [router.ts:116](/Users/xqk/FE/my-uni/packages/router/src/router.ts:116)、[router.ts:182](/Users/xqk/FE/my-uni/packages/router/src/router.ts:182)：五种 uni 导航；push/replace/replaceAll/pushTab 返回 Promise，success 后 resolve，fail 包装 Error | 需薄适配；动画、delta、错误形状、回调时序逐端验证 |
-| back | [router.ts:128](/Users/xqk/FE/my-uni/packages/router/src/router.ts:128)：直接 `uni.navigateBack`，返回 void，不经过 beforeEach | 可保留行为；不能宣称旧库已具备返回前置守卫 |
-| navType 覆盖 | [router.ts:162](/Users/xqk/FE/my-uni/packages/router/src/router.ts:162)：对象参数可覆盖调用方法对应的导航方式；`navType: 'back'` 仍先 resolve 并执行守卫 | 有约束；与 `router.back()` 是两条不同路径，必须分别测试 |
-| 前置守卫 | [router.ts:242](/Users/xqk/FE/my-uni/packages/router/src/router.ts:242)：顺序 await；支持返回值/Promise/next；false 拒绝 `NavigationCancelled`；重定向目标跳过本轮全部守卫 | 纯逻辑可复用；三参数非 Promise 守卫未同步调用 next 会报错，不等同于任意延迟 next 都受支持 |
-| 路由状态与后置钩子 | [router.ts:335](/Users/xqk/FE/my-uni/packages/router/src/router.ts:335)：app.mixin 的页面 onLoad/onShow 驱动；相同 fullPath 不更新、不执行 afterEach | 核心适配点；afterEach 不是每次成功导航都会调用，也不代表 onReady 或转场结束 |
-| 页面读取 | [router.ts:363](/Users/xqk/FE/my-uni/packages/router/src/router.ts:363)：栈顶 route、`$page?.fullPath`、onLoad 参数、options，WeakMap 按页面缓存 | 改用 x 公开 UniPage 和路由事件数据；不能要求 x 模拟旧私有字段 |
-| 安装与注入 | [router.ts:335](/Users/xqk/FE/my-uni/packages/router/src/router.ts:335)：provide 两个 Symbol key；写 `$Router`，defineProperty getter `$Route`；注册 mixin | app.use/provide/inject 可作为候选；全局属性 getter 与 Vapor 模板可见性独立验证，不能静默删掉旧入口能力 |
-| 组合式 hooks | [index.ts:18](/Users/xqk/FE/my-uni/packages/router/src/index.ts:18)：inject；useRoute 以 reactive 对象接收 watch + Object.assign 更新 | 复用候选；验证 Symbol、单份 Vue、响应式更新、watch 清理。Object.assign 不删除旧扩展键，是已有风险 |
-| 路由元数据与样式类型 | [types.ts:41](/Users/xqk/FE/my-uni/packages/router/src/types.ts:41)、[types.ts:1125](/Users/xqk/FE/my-uni/packages/router/src/types.ts:1125)；name/meta/style/自定义字段复制进 route | 数据可复用；GlobalStyle 内大量旧 app-plus/H5/小程序配置不代表 x 支持，router 本身也不应用这些窗口配置 |
-| typed-routes | [typed-routes.ts:26](/Users/xqk/FE/my-uni/packages/router/src/typed-routes.ts:26)、[typed-routes.ts:86](/Users/xqk/FE/my-uni/packages/router/src/typed-routes.ts:86)：generateRouteTypes/writeRouteTypes，主包/分包/alias/name，strict 可选 | Node 构建侧可复用；不能导入 App 运行时。新增 x 子入口时须保持模块增强身份一致 |
-| pages 配置接入 | [src/router/index.ts:10](/Users/xqk/FE/my-uni/src/router/index.ts:10)、[vite.config.ts:36](/Users/xqk/FE/my-uni/vite.config.ts:36)：Demo 自行展平 virtual:uni-pages；构建钩子写声明 | 库没有内置 pages.json 扫描器或 tabBar 校验器；x POC 先使用小型明确路由表，随后验证构建侧配置集成 |
+| 入口 | [index.ts:15](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/index.ts#L15) 导出 `createRouter`、`useRouter`、`useRoute` 和全部 types 导出 | 可复用入口概念；内部 `resolve`、注入 key 没有从包主入口导出，不能当作既有公共 API |
+| Router 对象 | [types.ts:1506](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/types.ts#L1506)：`currentRoute`、`routes`、`push/replace/replaceAll/pushTab/back`、`beforeEach/afterEach/install` | 需保持名称、返回值和注册后取消函数语义 |
+| 路由解析 | [router.ts:36](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L36)：name 查表，params 替换占位符并同时序列化为 query；path 分支合并 URL 参数与 query | 纯 TS 可复用；不是完整动态路由匹配器 |
+| query 编解码 | [utils.ts:6](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/utils.ts#L6)：decodeURIComponent；stringify 时过滤 null/undefined、对 `String(value)` 编码 | 可复用；数组会转逗号字符串，重复键保留最后值，不自行升级为 Vue Router 的数组语义 |
+| 导航分发 | [router.ts:116](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L116)、[router.ts:182](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L182)：五种 uni 导航；push/replace/replaceAll/pushTab 返回 Promise，success 后 resolve，fail 包装 Error | 需薄适配；动画、delta、错误形状、回调时序逐端验证 |
+| back | [router.ts:128](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L128)：直接 `uni.navigateBack`，返回 void，不经过 beforeEach | 可保留行为；不能宣称旧库已具备返回前置守卫 |
+| navType 覆盖 | [router.ts:162](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L162)：对象参数可覆盖调用方法对应的导航方式；`navType: 'back'` 仍先 resolve 并执行守卫 | 有约束；与 `router.back()` 是两条不同路径，必须分别测试 |
+| 前置守卫 | [router.ts:242](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L242)：顺序 await；支持返回值/Promise/next；false 拒绝 `NavigationCancelled`；重定向目标跳过本轮全部守卫 | 纯逻辑可复用；三参数非 Promise 守卫未同步调用 next 会报错，不等同于任意延迟 next 都受支持 |
+| 路由状态与后置钩子 | [router.ts:335](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L335)：app.mixin 的页面 onLoad/onShow 驱动；相同 fullPath 不更新、不执行 afterEach | 核心适配点；afterEach 不是每次成功导航都会调用，也不代表 onReady 或转场结束 |
+| 页面读取 | [router.ts:363](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L363)：栈顶 route、`$page?.fullPath`、onLoad 参数、options，WeakMap 按页面缓存 | 改用 x 公开 UniPage 和路由事件数据；不能要求 x 模拟旧私有字段 |
+| 安装与注入 | [router.ts:335](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/router.ts#L335)：provide 两个 Symbol key；写 `$Router`，defineProperty getter `$Route`；注册 mixin | app.use/provide/inject 可作为候选；全局属性 getter 与 Vapor 模板可见性独立验证，不能静默删掉旧入口能力 |
+| 组合式 hooks | [index.ts:18](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/index.ts#L18)：inject；useRoute 以 reactive 对象接收 watch + Object.assign 更新 | 复用候选；验证 Symbol、单份 Vue、响应式更新、watch 清理。Object.assign 不删除旧扩展键，是已有风险 |
+| 路由元数据与样式类型 | [types.ts:41](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/types.ts#L41)、[types.ts:1125](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/types.ts#L1125)；name/meta/style/自定义字段复制进 route | 数据可复用；GlobalStyle 内大量旧 app-plus/H5/小程序配置不代表 x 支持，router 本身也不应用这些窗口配置 |
+| typed-routes | [typed-routes.ts:26](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/typed-routes.ts#L26)、[typed-routes.ts:86](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/typed-routes.ts#L86)：generateRouteTypes/writeRouteTypes，主包/分包/alias/name，strict 可选 | Node 构建侧可复用；不能导入 App 运行时。新增 x 子入口时须保持模块增强身份一致 |
+| pages 配置接入 | [src/router/index.ts:10](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/src/router/index.ts#L10)、[vite.config.ts:36](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/vite.config.ts#L36)：Demo 自行展平 virtual:uni-pages；构建钩子写声明 | 库没有内置 pages.json 扫描器或 tabBar 校验器；x POC 先使用小型明确路由表，随后验证构建侧配置集成 |
 
 补充既有边界：`hash` 在 name 解析结果中保留，但没有拼入 fullPath；path 分支 hash 置空。`replace` 字段没有驱动分发，真正覆盖方式的是 navType。aliasPath 能匹配元数据，但发送给 uni 的仍是别名路径；不能据此宣称跨端别名重写已经实现。`redirectedFrom` 只见类型声明，没有对应赋值。库没有 RouterView、RouterLink、动态 addRoute、onError 或 ready API。
 
@@ -83,7 +85,7 @@ navigateTo/redirectTo 面向非 tabBar 页面，switchTab 面向 tabBar 且 URL 
 
 ## 构建与类型依赖闭合
 
-[package.json](/Users/xqk/FE/my-uni/packages/router/package.json) 声明 Vue peer `~3.4.38`；[tsdown.config.ts:15](/Users/xqk/FE/my-uni/packages/router/tsdown.config.ts:15) 生成 ESM/CJS 与声明，target 为 node16.14；[tsconfig.json](/Users/xqk/FE/my-uni/packages/router/tsconfig.json) 使用旧 `@dcloudio/types`。
+[package.json](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/package.json) 声明 Vue peer `~3.4.38`；[tsdown.config.ts:15](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/tsdown.config.ts#L15) 生成 ESM/CJS 与声明，target 为 node16.14；[tsconfig.json](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/tsconfig.json) 使用旧 `@dcloudio/types`。
 
 本轮构建后检查：运行时 index.mjs 仅外部导入 Vue，没有 node:*；index 声明也未发现 UniNamespace/@dcloudio 类型外泄。Node API 集中在 typed-routes 子入口。因而“生成器使用 fs，整个 router 无法进 App”的判断不成立，但消费工程仍必须排除生成器进入设备 bundle。
 
@@ -175,13 +177,13 @@ navigateTo/redirectTo 面向非 tabBar 页面，switchTab 面向 tabBar 且 URL 
 
 - `pnpm -F @wot-ui/router exec vitest run`：5 个文件，92/92 通过。环境为 happy-dom，导航为 mock，不能证明原生页面栈。
 - `pnpm -F @wot-ui/router test:types`：构建成功；12 个类型用例与 22 项补全检查通过。未执行 x 工程编译。
-- [Node 契约探针](/tmp/my-uni-router-x-research/contract-probe.mjs)：只导入本轮 dist，并 mock 导航回调。验证 back 不进守卫/返回 undefined；success 不触发生命周期时 currentRoute 仍为 `/`；alias 原样下发；并发慢 A/快 B 的下发顺序为 B/A；重定向只执行一轮守卫。它证明现有 JS 分支行为，不能证明 x 运行能力。
-- [现有 mock](/Users/xqk/FE/my-uni/packages/router/src/__tests__/setup.ts:23) 的 redirectTo/switchTab 简化成 push，且测试手动触发 mixin。这些测试适合逻辑回归，不能承担平台语义验收。
-- 官方 global-api/page/app-route 页面原始 HTML 保存在 `/tmp/my-uni-router-x-research/`；其余官方依据以上述相邻链接为准，查阅日期均为 2026-11-08。临时目录不是长期归档。
+- Node 契约探针（本机临时文件，未归档：`/tmp/my-uni-router-x-research/contract-probe.mjs`）：只导入本轮 dist，并 mock 导航回调。验证 back 不进守卫/返回 undefined；success 不触发生命周期时 currentRoute 仍为 `/`；alias 原样下发；并发慢 A/快 B 的下发顺序为 B/A；重定向只执行一轮守卫。它证明现有 JS 分支行为，不能证明 x 运行能力。
+- [现有 mock](https://github.com/wot-ui/my-uni/blob/5de843537bd5077d3ae27c83aa2bfa7a69ff660b/packages/router/src/__tests__/setup.ts#L23) 的 redirectTo/switchTab 简化成 push，且测试手动触发 mixin。这些测试适合逻辑回归，不能承担平台语义验收。
+- 官方 global-api/page/app-route 页面原始 HTML 保存在 `/tmp/my-uni-router-x-research/`（本机临时文件，未归档）；其余官方依据以上述相邻链接为准，查阅日期均为 2026-11-08。临时目录不是长期归档。
 
-本轮使用的 Wot 本机参考为只读：
+本轮使用的 Wot 本机参考为只读，属于本仓库未归档的外部本地文件；以下路径仅标识研究输入：
 
-- [迁移技能](/Users/xqk/FE/wot-ui/.agents/skills/migrate-uni-app-to-x/SKILL.md) 与 [证据分层](/Users/xqk/FE/wot-ui/.agents/skills/migrate-uni-app-to-x/references/target-validation.md)：建立旧契约、隔离适配、区分 mock/编译/运行/发行。
-- [x README](/Users/xqk/FE/wot-ui/uni-app-x/README.md:7) 与 [manifest](/Users/xqk/FE/wot-ui/uni-app-x/manifest.json:7)：确认其实际 Vapor + TS/bytecode 配置及历史入口，仅作试验参考。
+- 迁移技能 `/Users/xqk/FE/wot-ui/.agents/skills/migrate-uni-app-to-x/SKILL.md` 与证据分层 `/Users/xqk/FE/wot-ui/.agents/skills/migrate-uni-app-to-x/references/target-validation.md`：建立旧契约、隔离适配、区分 mock/编译/运行/发行。
+- x README `/Users/xqk/FE/wot-ui/uni-app-x/README.md:7` 与 manifest `/Users/xqk/FE/wot-ui/uni-app-x/manifest.json:7`：确认其实际 Vapor + TS/bytecode 配置及历史入口，仅作试验参考。
 
 决策建议：下一步仅批准 A 阶段隔离 POC，先回答 npm 消费、状态同步时机和全局属性三个 P0/P1 问题，再进入正式支持提案。本轮探索到此完成，未实现或承诺任何新公共入口。
