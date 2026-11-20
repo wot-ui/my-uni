@@ -50,6 +50,7 @@ interface NativeRoute {
   params?: Record<string, any>
   hash?: string
   meta?: Record<string, any>
+  matched?: unknown[]
 }
 
 interface VueRouterLike {
@@ -149,9 +150,13 @@ function normalizePageQuery(query: LocationQuery): LocationQuery {
 }
 
 function normalizeQueryValue(value: unknown): string {
-  if (Array.isArray(value))
-    return value.map(String).join(',')
   return value == null ? '' : String(value)
+}
+
+function cloneQuery(query: LocationQuery): LocationQuery {
+  return Object.fromEntries(
+    Object.entries(query).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+  )
 }
 
 function encodeQuery(query: LocationQuery): LocationQuery {
@@ -214,7 +219,7 @@ export function createRouter(options: RouterOptions): RouterX {
           const resolved = internals.resolve(to)
           pending = {
             path: resolved.path,
-            query: { ...resolved.query },
+            query: cloneQuery(resolved.query),
             encodedQuery: encodeQuery(resolved.query),
           }
           pendingNavigations.push(pending)
@@ -266,7 +271,7 @@ export function createRouter(options: RouterOptions): RouterX {
       ? `/${metaRoute.replace(/^\/+/, '')}`
       : route.path || '/'
     const pending = findPendingNavigation(pendingNavigations, path, route.query || {})
-    const query = { ...(committedRouteQueries.get(route) || pending?.query || historyQuery || route.query || {}) } as LocationQuery
+    const query = cloneQuery(committedRouteQueries.get(route) || pending?.query || historyQuery || route.query || {})
     try {
       const resolved = internals.resolve({ path, query })
       return {
@@ -331,7 +336,10 @@ export function createRouter(options: RouterOptions): RouterX {
       }
       removeBefore = nativeRouter.beforeEach(async (to, from) => {
         try {
-          await internals.runBeforeGuards(normalizeNativeRoute(to, queryForHistory(to)), normalizeNativeRoute(from))
+          const fromRoute = from.matched?.length === 0
+            ? router.currentRoute.value
+            : normalizeNativeRoute(from)
+          await internals.runBeforeGuards(normalizeNativeRoute(to, queryForHistory(to)), fromRoute)
           bridgeGuardError = undefined
           return true
         }
@@ -356,8 +364,8 @@ export function createRouter(options: RouterOptions): RouterX {
         if (failure)
           return
         const previousRoute = normalizeNativeRoute(from)
-        committedRouteQueries.set(to, { ...nextRoute.query })
-        historyQueries.set(historyKey(to), { ...nextRoute.query })
+        committedRouteQueries.set(to, cloneQuery(nextRoute.query))
+        historyQueries.set(historyKey(to), cloneQuery(nextRoute.query))
         internals.syncRoute(nextRoute.path, nextRoute.query)
         internals.runAfterGuards(nextRoute, previousRoute)
       })

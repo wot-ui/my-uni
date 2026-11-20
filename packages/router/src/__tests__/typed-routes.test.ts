@@ -321,6 +321,23 @@ describe('pages.json 读取', () => {
     }
   })
 
+  it('没有平台时使用 UNI_CUSTOM_CONTEXT 提供的条件标识', () => {
+    vi.stubEnv('UNI_PLATFORM', '')
+    vi.stubEnv('UNI_APP_X', '')
+    vi.stubEnv('UNI_CUSTOM_CONTEXT', '{"FEATURE":true,"DISABLED":false,"VUE3":false}')
+    try {
+      const source = `// #ifdef FEATURE && !DISABLED && VUE3
+{"pages":[{"path":"pages/feature"}]}
+// #endif`
+      expect(parseJsonText(preprocessPagesJson(source))).toEqual({
+        pages: [{ path: 'pages/feature' }],
+      })
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it.each(['true', 'false'])('对齐 5.36 SDK 的 Vapor 与鸿蒙 JSVM 固有上下文（DOM2=%s）', (enabled) => {
     vi.stubEnv('UNI_APP_X', 'true')
     vi.stubEnv('UNI_APP_X_DOM2', enabled)
@@ -343,7 +360,10 @@ describe('pages.json 读取', () => {
 
   it('缺少平台或条件区块不闭合时明确报错', () => {
     vi.stubEnv('UNI_PLATFORM', '')
+    vi.stubEnv('UNI_CUSTOM_CONTEXT', '')
     try {
+      expect(() => preprocessPagesJson('// #ifdef H5\n{}\n// #endif')).toThrow('UNI_PLATFORM')
+      vi.stubEnv('UNI_CUSTOM_CONTEXT', '{}')
       expect(() => preprocessPagesJson('// #ifdef H5\n{}\n// #endif')).toThrow('UNI_PLATFORM')
       expect(() => preprocessPagesJson('// #ifdef H5\n{}', { platform: 'h5' })).toThrow('缺少 #endif')
       expect(() => preprocessPagesJson('// #endif', { platform: 'h5' })).toThrow('不匹配')

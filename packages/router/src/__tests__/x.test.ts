@@ -15,10 +15,11 @@ interface NativeRoute {
   path: string
   query?: LocationQuery
   meta?: Record<string, any>
+  matched?: unknown[]
 }
 
 class FakeVueRouter {
-  currentRoute = ref<NativeRoute>({ path: '/', query: {}, meta: {} })
+  currentRoute = ref<NativeRoute>({ path: '/', query: {}, meta: {}, matched: [] })
   beforeGuards: ((to: NativeRoute, from: NativeRoute) => unknown)[] = []
   afterGuards: ((to: NativeRoute, from: NativeRoute, failure?: unknown) => void)[] = []
   installSawBridge = false
@@ -339,6 +340,26 @@ describe('uni-app x adapter', () => {
     expect(after).toHaveBeenCalledOnce()
   })
 
+  it('runs beforeEnter on the first H5 navigation when the initial location matches a root alias', async () => {
+    const router = createRouter({
+      routes: [{ path: '/pages/home', name: 'home', aliasPath: '/', beforeEnter: () => false }],
+    })
+    const app = createApp({})
+    const nativeRouter = new FakeVueRouter()
+    router.install(app)
+    disposals.push(router.dispose)
+    app.use(nativeRouter)
+
+    await expect(nativeRouter.push({
+      path: '/pages/home',
+      query: {},
+      meta: { route: 'pages/home' },
+    })).resolves.toBe(false)
+
+    expect(nativeRouter.currentRoute.value.path).toBe('/')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
   it('preserves query values already decoded by Vue Router', async () => {
     const { router, app } = setup()
     const nativeRouter = new FakeVueRouter()
@@ -411,6 +432,17 @@ describe('uni-app x adapter', () => {
     )
     expect(router.currentRoute.value.fullPath).toBe(expected)
     expect(after).toHaveBeenCalledOnce()
+  })
+
+  it('keeps array query values when Uni H5 encodes the comma separator', async () => {
+    const { router, app } = setup()
+    const nativeRouter = new FakeVueRouter()
+    app.use(nativeRouter)
+    mockUniH5Navigation(nativeRouter)
+
+    await router.push({ path: '/pages/detail', query: { tags: ['a', null] } })
+
+    expect(router.currentRoute.value.query).toEqual({ tags: ['a', null] })
   })
 
   it('runs beforeEnter and beforeResolve from the H5 vue-router bridge', async () => {
@@ -493,6 +525,37 @@ describe('uni-app x adapter', () => {
     )
     expect(router.currentRoute.value.query).toEqual({ text })
     expect(router.currentRoute.value.fullPath).toBe(`/pages/detail?text=${encodeURIComponent(text)}`)
+  })
+
+  it('keeps committed array query snapshots isolated from caller mutations', async () => {
+    const { router, app } = setup()
+    const nativeRouter = createVueRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: {}, meta: { route: 'pages/home' } },
+        { path: '/pages/detail', component: {}, meta: { route: 'pages/detail' } },
+      ],
+    })
+    app.use(nativeRouter)
+    await nativeRouter.isReady()
+    mockUniH5Navigation(nativeRouter)
+
+    const tags = ['a', 'b']
+    await router.push({ path: '/pages/detail', query: { tags } })
+    await nativeRouter.push('/')
+    tags.push('c')
+
+    const returned = new Promise<void>((resolve) => {
+      const remove = nativeRouter.afterEach(() => {
+        remove()
+        resolve()
+      })
+    })
+    nativeRouter.back()
+    await returned
+
+    expect(router.currentRoute.value.query).toEqual({ tags: ['a', 'b'] })
+    expect(router.currentRoute.value.fullPath).toBe('/pages/detail?tags=a%2Cb')
   })
 
   it('does not apply a completed navigation query to a new literal-percent navigation', async () => {

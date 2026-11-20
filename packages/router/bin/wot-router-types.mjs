@@ -111,7 +111,6 @@ function main() {
     return
 
   let timer
-  console.log(`[@wot-ui/router] 正在监听 ${relative(cwd, pagesJson) || pagesJson}`)
   const watcher = watch(dirname(pagesJson), (_event, filename) => {
     if (filename && resolve(dirname(pagesJson), filename.toString()) !== pagesJson)
       return
@@ -130,6 +129,7 @@ function main() {
     fail(`监听失败：${error.message}`)
     watcher.close()
   })
+  console.log(`[@wot-ui/router] 正在监听 ${relative(cwd, pagesJson) || pagesJson}`)
 }
 
 main()

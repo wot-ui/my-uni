@@ -79,7 +79,18 @@ assert.match(platformDts, /"\/web"/)
 assert.doesNotMatch(platformDts, /wechat/)
 
 writeFileSync(cliPages, originalPages)
-const watcher = spawn(process.execPath, [cliEntry, '--cwd', cliProject, '--watch'], { stdio: ['ignore', 'pipe', 'pipe'] })
+const watcherPreload = resolve(staging, 'watch-delay-preload.mjs')
+writeFileSync(watcherPreload, `
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
+const originalWatch = fs.watch
+fs.watch = (...args) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250)
+  return originalWatch(...args)
+}
+syncBuiltinESMExports()
+`)
+const watcher = spawn(process.execPath, ['--import', watcherPreload, cliEntry, '--cwd', cliProject, '--watch'], { stdio: ['ignore', 'pipe', 'pipe'] })
 const watcherExit = new Promise(resolveExit => watcher.once('exit', resolveExit))
 let watcherOutput = ''
 watcher.stdout.on('data', chunk => watcherOutput += chunk)

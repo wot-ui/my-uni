@@ -242,7 +242,11 @@ export function preprocessPagesJson(source: string, options: PagesJsonPreprocess
   if (!/^\s*(?:\/\/|\/\*)\s*#(?:if|ifdef|ifndef|elif|else|endif)\b/m.test(source))
     return source
   const target = (options.platform ?? process.env.UNI_PLATFORM)?.toLowerCase()
-  if (!target && !options.defines?.length)
+  const customContextValue = process.env.UNI_CUSTOM_CONTEXT
+    ? JSON.parse(process.env.UNI_CUSTOM_CONTEXT) as unknown
+    : undefined
+  const customContext = isRecord(customContextValue) ? customContextValue : undefined
+  if (!target && !options.defines?.length && !Object.keys(customContext ?? {}).length)
     throw new Error('pages.json 包含条件编译指令，请设置 UNI_PLATFORM 或指定 platform / --platform。')
   const normalize = (value: string) => value.replace(/-/g, '_').toUpperCase()
   const defines = new Set((options.defines ?? []).map(normalize))
@@ -264,15 +268,12 @@ export function preprocessPagesJson(source: string, options: PagesJsonPreprocess
     else if (isX)
       defines.delete('APP_PLUS')
   }
-  if (process.env.UNI_CUSTOM_CONTEXT) {
-    const context: unknown = JSON.parse(process.env.UNI_CUSTOM_CONTEXT)
-    if (isRecord(context)) {
-      for (const [key, enabled] of Object.entries(context)) {
-        if (enabled)
-          defines.add(normalize(key))
-        else
-          defines.delete(normalize(key))
-      }
+  if (customContext) {
+    for (const [key, enabled] of Object.entries(customContext)) {
+      if (enabled)
+        defines.add(normalize(key))
+      else
+        defines.delete(normalize(key))
     }
   }
   defines.add('VUE3')
